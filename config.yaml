@@ -28,6 +28,9 @@ model:
 
   halt_prior: 0.072       # halting is held to a mean of 1/this rows
   halt_thresh: 0.9        # at inference, stop at the first row past this
+  halt_freeze: true       # a halted character stops being computed, in
+                          # training and writing alike; later characters read
+                          # its final state at the deeper rows
   ponder_beta: 0.01       # weight on the halting KL
 
   bptt_window: 24         # rows gradient reaches back through. Also the
@@ -49,54 +52,43 @@ model:
 
 pool:
   # experts, width, depth and top_k are fixed in the manifest, like the model
-  # block. resident, ram_cache, capacity_factor, margin, dwell_chars and
-  # explore are run-time and can be changed freely.
+  # block. resident, ram_cache and capacity_factor are run-time and can be
+  # changed freely.
   experts: 64             # how many exist at the start; it grows from here
   width: 2048             # hidden units in one expert
   depth: 1                # SwiGLU blocks stacked inside one expert
   top_k: 8                # how many one character routes through
 
+  # HOW EXPERTS ARE CHOSEN - one rule. Every forward admits its own experts.
+  # While it has room on the card, every character, at every pass, ranks the
+  # whole pool with the router and asks for its top_k. A forward - a training
+  # window, a chunk of held-out file, a prompt, each character of a reply -
+  # may use at most `resident` different experts: they are admitted in order
+  # of how much router probability its characters' requests put on them,
+  # until the card is full, and a character whose request was not admitted
+  # takes its best admitted expert instead.
+  #
   # Three tiers: disk holds every expert, RAM caches the recently wanted,
-  # VRAM holds the working set. Only VRAM is scarce.
-  resident: 32            # VRAM - this, not `experts`, is what costs the card
+  # VRAM holds what the current forward admitted. Only VRAM is scarce.
+  resident: 32            # experts one forward may use - the card's slots, each
+                          # holding weights, gradient and Adam's moments
   ram_cache: 96           # RAM - experts kept in system memory
 
   capacity_factor: 1.5    # most of a batch one expert may take, as a multiple
                           # of its fair share; the rest is dropped. 0 removes
 
-  # Text one working-set decision covers. Two values, because reading and
-  # writing ask different things of it: a reader stays on one subject for a
-  # whole passage, while a reply changes subject with the prompt and drifts
-  # as it develops.
-  segment_chars: 2048     # while READING a corpus
-  reselect_chars: 64      # while WRITING - generation re-chooses this often
-
-  margin: 0.10            # how much more a candidate must be wanted to
-                          # displace a resident
-  dwell_chars: 2048       # how long a newcomer is safe from eviction
-  explore: 0.15           # random admissions on the older segment-router path
-  audition_slots: 1       # slots of the working set given each boundary to
-                          # the expert this text most wants that has earned
-                          # nothing - highest fit among those sitting on
-                          # key_floor. Nothing else here favours an expert
-                          # that has earned nothing, so one that falls off
-                          # the card stops training its router row and cannot
-                          # argue its way back; it is pruned for never having
-                          # been asked rather than for being asked and adding
-                          # nothing.
-                          #
-                          # An audition lasts ONE chunk and does not reset the
-                          # clock prune deletes on. Both matter: the first
-                          # version let the expert keep its slot by inertia,
-                          # after which an ordinary swap reset the clock and
-                          # the pool went immortal - 0 experts dying where 12
-                          # had been. 0 disables it.
-  key_floor: 0.25         # how much an expert that has earned nothing may
-                          # still be wanted for its fit alone. Selection
-                          # scales fit by gate/max_gate, so a low floor locks
-                          # a grown expert out once its trial ends: it cannot
-                          # be chosen, so its gate cannot move, so it is never
-                          # chosen again. Raise it to keep the pool reachable.
+  # EXPLORATION, only in forwards that train. An expert used less than its
+  # fair share of recent training forwards (resident / experts) gets a bonus
+  # on its router score wherever something is chosen - what a character asks
+  # for, and the top_k it takes - of explore_bias * exp(-its share / fair
+  # share): the whole bonus at no use, a third of it at the fair share, next
+  # to nothing when busy. It never changes how much a chosen expert
+  # contributes, and the prune clock counts only what the router would have
+  # admitted without it: being tried keeps nothing alive, being wanted does.
+  explore_bias: 0.15      # logits; 0 turns exploration off 
+                          # (the higher the number is the more reads from the disk 
+                          # are expected, so the reading/writing speed would be less)
+  explore_steps: 1000     # training steps "recent use" is averaged over
 
 training:
   save_every: 5           # minutes between checkpoints
@@ -147,10 +139,8 @@ growth:
                           # verdict. Small so it cannot shout before it earns
 
 prune:
-  # USE IT OR LOSE IT. An expert is deleted when nothing has admitted it to
-  # the card for this long, and it is never deleted inside its first
-  # survival_chars - the same number is its routing trial, during which it
-  # competes on how well its key fits rather than on its gate.
+  # USE IT OR LOSE IT. An expert is deleted when nothing has admitted it for
+  # this long, and it is never deleted inside its first survival_chars.
   survival_chars: 100_000_000
 
   dying_at: 0.65          # how far through that window an expert must get,

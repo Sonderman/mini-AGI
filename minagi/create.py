@@ -74,10 +74,9 @@ def create(out, seed=0, verbose=True, force=False, **over):
                       pool_depth=depth, pool_top_k=top_k,
                       # Router rows belong to EXPERTS, not to VRAM slots, so
                       # this is one row per expert in the pool - not the
-                      # working set. Sizing it to `resident` writes a router
+                      # card's slots. Sizing it to `resident` writes a router
                       # too small to address most of the pool, and the model
-                      # then refuses to load. Growth adds rows to both this
-                      # and the segment router.
+                      # then refuses to load. Growth adds a row per newborn.
                       pool_max=experts)
     torch.manual_seed(seed)
     m = RecurCoder(cfg)

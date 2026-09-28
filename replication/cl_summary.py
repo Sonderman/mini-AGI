@@ -20,7 +20,7 @@ def R(name):
 
 
 ARMS = [
-    (R("static.json"), "frozen working set, trunk = expert LR"),
+    (R("static.json"), "experts frozen, trunk = expert LR"),
     (R("none.json"), "swapping, trunk = expert LR"),
     (R("trunk01.json"), "swapping, trunk at 0.1x  (the run)"),
 ]

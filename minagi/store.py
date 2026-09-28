@@ -183,7 +183,7 @@ def _save_paged(model, pool, path, step, val, opt, cfg, verbose, extra=None):
     core, routers = {}, {}
     for k, v in model.state_dict().items():
         if k.startswith("pool."):
-            if k.endswith(("gate", "segment_router.weight")):
+            if k.endswith("gate"):
                 routers[k] = v.detach().cpu().numpy()
             continue                      # w1/w3/w2 are slots, not experts
         (routers if _is_router(k) else core)[k] = v.detach().cpu().numpy()
@@ -225,10 +225,8 @@ def _save_paged(model, pool, path, step, val, opt, cfg, verbose, extra=None):
     # cannot be loaded back without widening it by hand.
     d["pool_max"] = max(int(d.get("pool_max") or 0), len(entries))
     # Which experts have ever been resident, and when each was admitted.
-    # This belongs in the checkpoint: the cold-start sweep exists to give an
-    # expert that has never been on the card its one chance, and if the flags
-    # reset every run the sweep restarts every run and the working set is
-    # never allowed to settle.
+    # Whether each expert has ever been on the card: a record, carried so a
+    # resumed run still knows it.
     if hasattr(pool, "telemetry"):
         # Everything the pool knows about its own experts. Rebuilt from
         # nothing every run otherwise, so a long run would end able to say
@@ -236,7 +234,6 @@ def _save_paged(model, pool, path, step, val, opt, cfg, verbose, extra=None):
         tel = pool.telemetry()
         manifest_tel = tel
         d["pool_ever"] = tel["ever"]
-        d["pool_since"] = tel["since"]
     else:
         manifest_tel = None
     manifest = {"step": step, "val": val, "cfg": d,

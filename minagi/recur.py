@@ -48,6 +48,9 @@ class RecurConfig(Config):
     ponder_beta: float = 0.01
     halt_prior: float = 0.4   # geometric prior on depth; mean ~ 1/halt_prior
     halt_thresh: float = 0.9  # inference: halt once cumulative exceeds this
+    # a halted character stops being computed, in training and inference
+    # alike, and later characters read its final state at deeper passes
+    halt_freeze: bool = False
 
     @property
     def n_layer_effective(self):
@@ -166,50 +169,6 @@ class RecurCoder(nn.Module):
         c = self.cfg
         return c.n_prelude + c.max_steps * (c.n_recur + c.n_coda)
 
-    def want_experts(self, idx):
-        """
-        Ask the pool for what this text wants, and make it resident.
-
-        Called before the forward that reads it, so the experts that compute
-        the forward are the ones the backward updates. Swapping inside a step
-        would hand expert A's gradient to whatever occupied its slot by the
-        time backward ran - and with checkpointing, the forward is recomputed
-        during backward, so it would not even be consistent with itself.
-        """
-        p = getattr(self, "pool", None)
-        if p is None or not hasattr(p, "demand"):
-            return 0
-        from .pool import PooledMLP
-        sites = [m for m in self.modules() if isinstance(m, PooledMLP)]
-        if not sites:
-            return 0
-        with torch.no_grad():
-            x = self.tok_emb(idx)
-            want = p.demand(x, sites, sites[0].top_k)
-            moved = p.swap_to(p.choose_by_demand(want))
-        p.arm_observation()      # collect the states this chunk routes on
-        return moved
-
-    def begin_segment(self):
-        """
-        Choose the working set for the stretch of text about to be read.
-
-        Only a paged pool has anything to do here. The choice is scored on the
-        segment just finished, so it cannot see what it is about to predict,
-        and it is made once for the whole model rather than per token - which
-        is what lets the set be small enough to be worth paging.
-        """
-        p = getattr(self, "pool", None)
-        if p is None or not hasattr(p, "swap_to"):
-            return 0
-        return p.swap_to(p.choose())
-
-    def end_segment(self, h):
-        """Remember what this segment looked like, for the next choice."""
-        p = getattr(self, "pool", None)
-        if p is not None and hasattr(p, "observe"):
-            p.observe(h)
-
     def empty_caches(self):
         return [{"k": None, "v": None} for _ in range(self.n_slots())]
 
@@ -224,7 +183,9 @@ class RecurCoder(nn.Module):
         [min_steps, max_steps]: the average cost stays near the mean while the
         model still sees deep passes often enough to learn to use them.
 
-        Inference runs the full ceiling and lets halting decide per character.
+        Inference runs up to the ceiling. With halt_freeze a character stops
+        where it halts, as it does in training; without, every character runs
+        the ceiling and keeps the prediction of the pass where it halted.
         """
         c = self.cfg
         if not self.training or c.train_steps_mean <= 0:
@@ -236,6 +197,23 @@ class RecurCoder(nn.Module):
                 collect=False):
         cfg = self.cfg
         B, T = idx.shape
+        if hasattr(self.pool, "begin_forward"):
+            # EVERY FORWARD ADMITS ITS OWN EXPERTS: nothing admitted yet. What
+            # one forward uses has to be on the card together - through its
+            # backward and the optimiser step when it trains - and nothing
+            # more does, so the next character of a reply, or the next chunk
+            # inside the attention window, chooses again. A forward from
+            # position 0 also begins a new text, which is what the prune clock
+            # counts. See PagedPool.admit.
+            #
+            # A forward that trains also explores: its selection favours the
+            # experts used least of late (PagedPool.begin_forward). Measuring
+            # and writing never do - they use the router's own choice.
+            explore = self.training and torch.is_grad_enabled()
+            if caches is None or pos_offset == 0:
+                self.pool.begin_text(explore)
+            else:
+                self.pool.begin_forward(explore)
         x = self.tok_emb(idx)
         if pos_offset + T > self.rope_cos.shape[0]:
             # Reading past the rotary tables gives an empty slice and a
@@ -265,16 +243,47 @@ class RecurCoder(nn.Module):
         per_step = []
 
         n_steps = self.sample_depth()
+        # FREEZE AND CARRY (cfg.halt_freeze). A character that has halted is
+        # finished: its state stops changing, its experts stop running, and
+        # the characters after it read that final state at every deeper pass,
+        # through the keys and values the recurrent block makes of it. Those
+        # are the same at every pass - one block, one final state - so a
+        # character costs only the passes it asked for, and one that halts
+        # asks for no more experts. Training runs exactly this as well, so
+        # what the model learns from is what it writes with.
+        freeze = bool(getattr(cfg, "halt_freeze", False))
+        if freeze and (cfg.n_recur != 1 or cfg.n_coda):
+            raise ValueError(
+                "halt_freeze carries a halted character's final state to the "
+                "deeper passes through the one recurrent block, so it needs "
+                f"n_recur 1 and n_coda 0, not {cfg.n_recur} and {cfg.n_coda}")
+        carried = None            # every character's final keys and values
         for n in range(n_steps):
             # truncated backprop: only the last few passes carry gradient, so
             # memory does not grow with depth
             if (targets is not None and cfg.bptt_window > 0
                     and n < n_steps - cfg.bptt_window):
                 h = h.detach()
-            h = self.adapter(torch.cat([h, x], dim=-1))
-            for blk in self.recur:
-                h = blk(h, cos, sin, slot(ci))
+            active = (~halted).squeeze(-1) if freeze and n else None
+            if active is not None and not bool(active.any()):
+                # every character has halted. What is left is what the
+                # characters after them will read at this pass.
+                if caches is not None:
+                    blk = self.recur[0]
+                    if carried is None:
+                        u = self.adapter(torch.cat([h, x], dim=-1))
+                        carried = blk.attn.kv(blk.ln1(u), cos, sin)
+                    blk.attn.extend(slot(ci), *carried)
                 ci += 1
+                if targets is None:
+                    continue
+            else:
+                hn = self.adapter(torch.cat([h, x], dim=-1))
+                for blk in self.recur:
+                    hn = blk(hn, cos, sin, slot(ci), active=active)
+                    ci += 1
+                h = (hn if active is None
+                     else torch.where(active.unsqueeze(-1), hn, h))
             y = h
             for blk in self.coda:
                 y = blk(y, cos, sin, slot(ci))
@@ -301,6 +310,10 @@ class RecurCoder(nn.Module):
                 term = logits_n * p_n.to(logits_n.dtype)
                 halted_logits = (term if halted_logits is None
                                  else halted_logits + term)
+                if freeze:
+                    # the same rule writing halts by; from the next pass a
+                    # halted character's loss is its final prediction's
+                    halted = halted | ((1.0 - cum) >= cfg.halt_thresh)
             else:
                 # Each token halts on its own schedule: the first step whose
                 # cumulative halting mass crosses the threshold is the one
@@ -320,9 +333,6 @@ class RecurCoder(nn.Module):
                 per_step.append({"step": n + 1,
                                  "halt_p": float(p_n.mean()),
                                  "cum": float((1 - cum).mean())})
-
-        # what this stretch of text looked like, for the next segment's choice
-        self.end_segment(x)
 
         if targets is None:
             out = {"steps": steps_used} if collect else None
@@ -348,172 +358,21 @@ class RecurCoder(nn.Module):
         # downstream reflects what the model would actually have emitted
         return halted_logits, loss
 
-    @torch.no_grad()
-    def peek_experts(self, idx, free=True, window=None):
-        """
-        Choose the working set from THIS text, by reading it once first.
-
-        demand() scores the states the call sites routed on while reading the
-        previous chunk, and that is the right evidence in the middle of a
-        passage: text is locally coherent, and what the last few hundred
-        characters needed is a fair guess at what the next few hundred will.
-
-        At a boundary it is not evidence at all. The first chunk of a new
-        passage, and a prompt, have no previous chunk of their own - so the
-        buffer still holds the states of whatever was read last, which is a
-        different subject entirely. demand() then answers a question nobody
-        asked: it returns the same working set for a chess game and a Python
-        file, because the text it is scoring is neither of them. Measured: the
-        same buffer with two different prompts gave byte-identical working
-        sets.
-
-        So read the chunk once and score on its own states - but read it FROM
-        A FIXED STARTING SET, because the read alone is not enough.
-
-        The peek routes through the pool at every recurrence step, so the
-        states it collects depend on two things: the text, and whichever
-        experts happened to be resident when it began. The second is the
-        previous subject, and it does not wash out - measured over seven
-        passages, peeking from wherever the last one left off gave 4.8
-        different working sets for one prompt, and re-reading up to three
-        times still gave 3.3.
-
-        Pinning the starting set to a constant removes that input. The states
-        are then a function of the text alone, and the same passage chooses
-        the same experts whatever preceded it - 1.0 distinct working sets
-        across the same seven passages, and one answer per arithmetic prompt
-        instead of two. A boundary is meant to be a blank slate; this is what
-        makes it one.
-
-        The constant is the top of the gate rather than an arbitrary set.
-        Any fixed set gives the invariance, since all that matters is that it
-        never changes. Taking the experts that have earned the most means the
-        peek also reads with competent ones, so the states it hands to
-        demand() are worth scoring: on the nine sample prompts this reached
-        62 of the pool against 43 for the alternative that gets determinism
-        by throwing evidence away.
-
-        The set moves as the gate moves, so it is recomputed rather than
-        cached. That is a topk over the pool and costs nothing. It means the
-        choice is a function of the text and the current weights - which is
-        the intent: a boundary should not depend on what was READ before it.
-
-        Costs one forward over `window` characters and two swaps - one into
-        the fixed set, one into the chosen one. Paid once per passage in
-        training, one chunk in 32,768 characters, and once per reply while
-        serving. Every chunk after the first keeps want_experts, which is
-        free. The forward is under no_grad, and reading carries 2,048
-        characters WITH gradients every chunk, so a chunk without them once
-        per passage is not a cost worth trading evidence for.
-
-        BOUNDED, and not only for the cost. `window` defaults to the chunk
-        reading uses, so a passage boundary scores the whole chunk it is
-        about to read - all of it, not a slice whose size came from
-        somewhere else. A prompt is not bounded that way: it is however long
-        the conversation has got, and forwarding that in one pass
-        materialises every position across every block application at once,
-        which is the thing serve.py's chunked prefill exists to avoid, and
-        past cfg.block it is not a forward at all but a rotary-table error.
-
-        The tail is what the window takes when it binds. For a prompt that
-        is the right end - the last characters are the message being
-        answered. For a chunk it never binds, because the window is the
-        chunk.
-        """
-        if window is None:
-            # the chunk reading uses. Hardcoding it here put the number in
-            # two places with nothing tying them together, and the literal
-            # that got written was train.py's fallback rather than the
-            # setting in effect - so the peek scored a quarter of the chunk
-            # it was choosing for.
-            from .config import get, load
-            window = int(get(load(), "training.chunk", 512))
-        look = idx[:, -min(window, self.cfg.block):]
-        p = getattr(self, "pool", None)
-        if p is None or not hasattr(p, "demand") or not hasattr(p, "swap_to"):
-            # No pool, or one with every expert resident: there is no working
-            # set to choose and nothing to peek from. Ask anyway. A caller
-            # asks the pool with the text before generating, and that holds
-            # whichever pool is underneath - the ask is simply a no-op here.
-            return self.want_experts(look)
-        p.swap_to(self.canonical_experts())
-        p.arm_observation()          # drop what the last text left behind
-        self(look, caches=self.empty_caches(), pos_offset=0)
-        # NO AUDITIONS AT A BOUNDARY. An audition is chosen by a clock, so it
-        # depends on what was read before - which is exactly the dependence a
-        # boundary is supposed to be free of. Auditions still happen on every
-        # chunk within the passage, which is fifteen of every sixteen.
-        aud, p.audition_slots = getattr(p, "audition_slots", 0), 0
-        try:
-            return self.choose_for(look, free=free)
-        finally:
-            p.audition_slots = aud
-
-    @torch.no_grad()
-    def canonical_experts(self):
-        """
-        The fixed set a boundary reads from: the most-earned experts.
-
-        Fixed is the requirement - the peek's states must not depend on what
-        was resident before it. Most-earned is the preference, so that the
-        text is read by experts that contribute rather than by whichever ones
-        an arbitrary rule named.
-        """
-        p = self.pool
-        n = getattr(p, "_n", 0)
-        k = min(len(p.slots), n)
-        g = p.gate.detach().abs()[:n]
-        return torch.topk(g, k).indices.tolist()
-
-    @torch.no_grad()
-    def choose_for(self, idx, free=False):
-        """
-        Put the experts this text wants on the card.
-
-        A paged model loads with an EMPTY card - every slot -1, every expert
-        weight zero - so anything that generates without calling this runs on
-        the trunk alone and the pool contributes nothing at all. That is not a
-        degraded model, it is a different and much smaller one.
-
-        `free` releases the hysteresis that keeps the working set steady while
-        reading a continuous stream. A prompt is the opposite: a deliberate
-        change of subject, and the model should be free to re-choose at once.
-        """
-        p = getattr(self, "pool", None)
-        if p is None or not hasattr(p, "demand"):
-            return 0
-        keep = (getattr(p, "dwell", None), getattr(p, "margin", None))
-        if free and keep[0] is not None:
-            p.dwell, p.margin = 0, 0.0
-        try:
-            return self.want_experts(idx)
-        finally:
-            if free and keep[0] is not None:
-                p.dwell, p.margin = keep
-
     def generate(self, idx, max_new_tokens, temperature=0.0, top_k=0,
                  top_p=1.0, collect=False, rep_penalty=1.0,
-                 no_repeat_ngram=0, reselect_every=None,
-                 adapt_strength=2.5, adapt_decay=0.88):
-        # None means "whatever config.yaml says". Hardcoding it here put the
-        # same literal in three files with nothing tying them together, while
-        # its sibling - how often READING re-chooses - sat in the settings.
-        if reselect_every is None:
-            from .config import get, load
-            reselect_every = get(load(), "pool.reselect_chars", 64)
+                 no_repeat_ngram=0, adapt_strength=2.5, adapt_decay=0.88):
+        # The prompt's forward admits the experts its characters ask for, and
+        # then every character of the reply is a forward of its own that
+        # admits the experts it asks for - loading any that are not on the
+        # card. When the attention window fills, the context is re-read from
+        # position 0 - a new text.
         self.eval()
         cfg = self.cfg
         caches = self.empty_caches()
         out = idx[:, -cfg.block:]
         cur, offset = out, 0
         steps_log = []
-        # the prompt decides which experts answer it
-        self.choose_for(out, free=True)
         for _i in range(max_new_tokens):
-            # and the answer decides again as it develops: what the text wants
-            # after a hundred characters is not what the prompt alone asked for
-            if reselect_every and _i and _i % reselect_every == 0:
-                self.choose_for(cur)
             if offset + cur.shape[1] > cfg.block:
                 caches = self.empty_caches()
                 cur = out[:, -cfg.block // 2:]
@@ -611,7 +470,7 @@ def _load_dir(path, device, paged=None, read_only=False):
     A directory written by the paged trainer holds one file per expert, and
     materialising all of them costs the whole pool in RAM - which grows every
     time the model does. So a manifest marked `paged` is loaded through the
-    paging path by default: only the working set becomes tensors, and the cost
+    paging path by default: only the experts on the card become tensors, and the cost
     stops depending on how large the pool has become. Pass paged=False to
     force every expert into memory, which is what a tool that needs to touch
     all of them at once must do.

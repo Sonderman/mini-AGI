@@ -157,8 +157,6 @@ def _self_facts():
     f["context"] = man.get("context_now") or _g(c, "model.context_start",
                                                 f["block"])
     f["context_ceiling"] = cfg.get("block") or _g(c, "model.context_end", _g(c, "model.context", 24576))
-    f["margin_pct"] = int(100 * _g(c, "pool.margin", 0.10))
-    f["dwell"] = _g(c, "pool.dwell_chars", _g(c, "pool.dwell", 2048))
     f["precision"] = _g(c, "training.precision", "bf16")
     f["n_head"] = cfg.get("n_head") or _g(c, "model.n_head", 8)
     f["head_dim"] = f["d_model"] // max(f["n_head"], 1)
@@ -184,6 +182,7 @@ def _self_facts():
                                      100_000_000)).replace("_", ""))
     f["survival_chars_m"] = f["survival_chars"] / 1e6
     f["dying_at"] = _g(c, "prune.dying_at", 0.65)
+    f["explore_bias"] = _g(c, "pool.explore_bias", 0.0)
     f["min_visit_chunks"] = _g(c, "data.min_visit_chunks", 16)
     f["context_step"] = _g(c, "model.context_step", 1)
     f["visit_chars"] = f["min_visit_chunks"] * f["chunk"]

@@ -79,6 +79,19 @@ class LiveLearner:
         pool = getattr(model, "pool", None)
         if pool is not None and hasattr(pool, "attach_optimiser"):
             pool.attach_optimiser(self.opt)
+        # ADAM'S MOMENTS carry on from where the weights directory left them,
+        # as they do when the trainer resumes. A fresh optimiser would start
+        # every tensor from zero moments at the first step - the trunk's and
+        # every expert on the card, instead of their own - and its first
+        # save would write that short history over the trainer's in
+        # optim.npz, step counters included. The experts' own moments are
+        # put in place by the pool before each step (PagedPool._own_moments).
+        if weights_dir:
+            from . import store as weights_store
+            try:
+                weights_store._load_optim(self.opt, model, weights_dir)
+            except Exception as e:             # never stop the server for it
+                print(f"  [note] optimiser moments not restored: {e}")
 
     def feed(self, text, tok, note=""):
         """

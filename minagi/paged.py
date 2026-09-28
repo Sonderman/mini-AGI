@@ -5,36 +5,54 @@ The claim this exists to make true: disk holds every expert, RAM caches the
 ones recently wanted, and VRAM holds only the ones being worked with now. Three
 tiers, and only the last is scarce.
 
-Paging is a consequence of how the routing is arranged, not of storage. Routing
-per character alone cannot support it: every call site at every depth picks its
-own top-k, so a single chunk makes sites x depth x top_k x characters
-selections and their union is essentially the whole pool. Nothing could be left
-off the card, because everything is wanted within microseconds of everything
-else.
+WHICH EXPERTS ARE ON THE CARD is decided by one rule, and it is the router's:
 
-So the routing is split into two questions at two timescales, and the paging
-follows from the slower one:
+    Every forward admits its own experts. While it has room on the card,
+    every character, at every pass, ranks the WHOLE pool with the router and
+    asks for its top_k. A forward may use at most `resident` different
+    experts: they are admitted in order of how much router probability its
+    characters' requests put on them, until the card is full. Every character
+    routes among the admitted experts, so one whose request was not admitted
+    takes its best admitted expert instead.
 
-    SEGMENT     before each stretch of text, one working set of `resident`
-                experts is chosen for the whole model, from a summary of the
-                segment just finished. This is the set that lives in VRAM.
-    TOKEN       within the segment, each call site still picks its own top-k,
-                but only from the experts that are resident.
+While training, the choice also EXPLORES: an expert used less than its fair
+share of recent training forwards gets a bonus on its router score wherever
+something is chosen, so rarely used experts get tried and trained. The bonus
+never changes how much a chosen expert contributes, and the prune clock counts
+only what the router would have admitted without it - see begin_forward.
 
-The choice is made from the PREVIOUS segment, so it cannot see the text it is
-about to predict.
+A forward is whatever the model computes at once - a training window, a chunk
+of held-out file, a prompt, and then each character of the reply. What is
+computed depends only on the text and the weights; what happened to be on the
+card before only decides how many experts have to be loaded.
 
-WHAT MAKES THIS HARD is not the weights. It is the optimiser. Adam keeps two
+The cap is not arbitrary. Everything a forward used must still be on the card
+for its backward and for the optimiser step, and an expert on the card for
+training costs its weights, their gradient and Adam's two moments. A forward
+with no backward after it - a held-out chunk, a character being written -
+needs its experts only while it runs, so the next forward is free to choose
+again.
+
+WHAT MAKES PAGING HARD is not the weights. It is the optimiser. Adam keeps two
 moments per parameter, and those belong to the EXPERT, not to the slot of VRAM
-it happens to occupy. Swapping an expert out without its moments would hand its
-history to whichever expert took its place - the model would keep training, and
-every swapped expert would carry a stranger's momentum. So `swap_to` moves
-moments with weights, and the optimiser is told about the slots rather than
-about the experts.
+it happens to occupy. Stepping an expert with the moments its slot held for the
+expert before it would hand it a stranger's momentum - the model would keep
+training, and every paged expert would be steered by someone else's history.
+So every expert on the card is stepped with its own moments, and the optimiser
+is told about the slots rather than about the experts.
+
+Only a step reads them, so they travel only to a step: an expert comes to the
+card with its weights alone, and just before each optimiser step
+(_own_moments) every expert on the card that is not already holding its own
+moments gets them from its entry in RAM or on disk. A reply loads experts at
+almost every character and steps none of them, so writing moves no moments at
+all; parking an expert that was stepped carries its moments back with its
+weights.
 """
 
 import math
 import os
+import weakref
 from collections import OrderedDict
 
 import numpy as np
@@ -100,13 +118,17 @@ class Tiers:
                 out[k] = unpack_bf16(z[k]).clone()
         return out
 
-    def fetch(self, i):
-        """The expert's CPU tensors, from RAM if it is there."""
+    def fetch(self, i, count=True):
+        """The expert's CPU tensors, from RAM if it is there.
+
+        `count=False` for a fetch that does not put the expert on the card -
+        its moments, fetched for a step - so the hit rate stays a fact about
+        loads."""
         if i in self.ram:
-            self.hits += 1
+            self.hits += count
             self.ram.move_to_end(i)
             return self.ram[i]
-        self.reads += 1
+        self.reads += count
         e = self._from_disk(i)
         self.ram[i] = e
         self.ram.move_to_end(i)
@@ -161,7 +183,7 @@ class Tiers:
 
 class PagedPool(nn.Module):
     """
-    A pool whose VRAM cost is set by the working set, not by its size.
+    A pool whose VRAM cost is set by the card's slots, not by its size.
 
     Presents enough of SharedPool's surface that PooledMLP routes into it
     unchanged: `gate`, `n_experts()`, `stacked()`, and the usage buffers. What
@@ -170,7 +192,7 @@ class PagedPool(nn.Module):
 
     Routing indices are into the RESIDENT set, so a call site picking expert 3
     means the third of the experts currently held, not the third on disk.
-    `self.slots` maps back.
+    `self.slots` maps back. Which experts are held is decided by admit().
     """
 
     def __init__(self, path, d_model, d_ff, n_experts, resident=16,
@@ -191,6 +213,20 @@ class PagedPool(nn.Module):
         self.w3 = nn.Parameter(torch.zeros(self.resident, d_ff, d_model))
         self.w2 = nn.Parameter(torch.zeros(self.resident, d_model, d_ff))
         self.slots = [-1] * self.resident          # slot -> expert id
+        # What each slot's contents were measured against when its expert was
+        # loaded: the slot tensors' version counters and the optimiser steps
+        # seen. While both are unchanged the expert is exactly its copy in RAM
+        # or on disk, so parking it copies nothing back and writes nothing.
+        self._loaded_at = [None] * self.resident
+        self._stepped = 0
+        self._hooked = set()
+        # Whether each slot's optimiser moments are its expert's own. An
+        # arriving expert brings its weights only, so its slot's moments are
+        # still whatever the slot held before, until _own_moments fills them
+        # ahead of a step. `_own_in` is the moment tensors that was true of -
+        # replaced ones, as a restore replaces them, are nobody's.
+        self._own = [False] * self.resident
+        self._own_in = None
 
         # gates are one float per expert, so the whole pool's worth is nothing
         self.gate = nn.Parameter(torch.ones(n_experts))
@@ -198,71 +234,27 @@ class PagedPool(nn.Module):
             self.register_buffer(name, torch.zeros(n_experts),
                                  persistent=False)
 
-        # the segment router: which experts to hold for the next stretch
-        self.segment_router = nn.Linear(d_model, max(n_experts, 1), bias=False)
-        nn.init.normal_(self.segment_router.weight, 0.0, 0.02)
-        self.register_buffer("summary", torch.zeros(d_model), persistent=False)
-
         self.grow_events = []
         self.pressure = 0.0
         self.want_k = 0.0
         self.swaps = 0
         self._opt = None
         self._sites = []          # the call sites routing into this pool
-        # how long ago each expert was last resident, counted in segments. An
-        # expert that is never chosen never trains, never earns a gate, and is
-        # eventually pruned for it - so without this the pool would collapse to
-        # whichever experts the untrained router happened to favour first. It
-        # is what the exploration reserve in choose_by_demand() sorts on.
+        # THE PRUNE CLOCK: the text count at which each expert was last
+        # admitted. An expert nothing admits is deleted once this falls far
+        # enough behind - see prune() and dying(). A text begins at a forward
+        # from position 0; the forwards that continue it through the attention
+        # cache admit their own experts but do not move the clock, so writing
+        # a reply one character at a time does not age the pool.
         self.register_buffer("last_seen", torch.zeros(n_experts),
                              persistent=False)
+        # texts begun so far - the unit last_seen is counted in
         self.segments = 0
-        self.explore = 0.25              # kept for choose(); see choose_by_demand
-        # how much better a candidate must be before it displaces a resident,
-        # and how long a newcomer is safe from being displaced itself. Together
-        # they are what stops the working set churning on noise.
-        self.margin = 0.10
-        self.dwell = 4
+        # whether an expert has ever been on the card, and how many times it
+        # has been brought there, over the model's whole life. Record only:
+        # neither takes part in choosing.
         self.register_buffer("ever", torch.zeros(n_experts, dtype=torch.bool),
                              persistent=False)
-        # What each expert responds to, derived from its own weights.
-        #
-        # A router row only receives gradient while its expert is resident, so
-        # asking a learned router "which experts do you want" can only ever
-        # name the experts you already have - the answer is self-reinforcing.
-        # A key is not like that: it is a property of the expert, defined
-        # whether or not it has ever been loaded, and it moves when the expert
-        # learns rather than when the scheduler happens to pick it.
-        #
-        # The key is the dominant right singular vector of w1 - the input
-        # direction the expert's first layer reads most strongly, which is as
-        # close to "what this expert is for" as its own weights can say.
-        self.register_buffer("keys", torch.zeros(n_experts, d_model),
-                             persistent=False)
-        # when an expert was ADMITTED, which is not when it was last seen:
-        # a resident is seen every chunk it stays, so measuring dwell against
-        # last_seen makes every resident permanently too young to evict and
-        # the working set can never move at all
-        # WHEN AN EXPERT WAS LAST GIVEN A TURN IT DID NOT EARN. Auditions
-        # cycle by this rather than by last_seen, because an audition
-        # deliberately does NOT reset last_seen - the prune clock - and an
-        # expert picked by staleness alone would therefore stay the stalest
-        # and be picked again every boundary forever.
-        self.register_buffer("last_try", torch.zeros(n_experts),
-                             persistent=False)
-        # slots of the working set reserved each boundary for the expert that
-        # has gone longest without a turn. 0 disables it, which is the
-        # default and is bit-identical to having no such mechanism.
-        self.audition_slots = 0
-        self._auditioned = ()
-        self._fit_raw = None
-        self._suppressed = None
-        self.register_buffer("since", torch.zeros(n_experts),
-                             persistent=False)
-        # How many times each expert has been brought onto the card, over the
-        # model's whole life rather than this session. `use` counts routing
-        # hits and `admits` counts admissions: an expert can sit resident for
-        # a long stretch and be heavily routed while being admitted once.
         self.register_buffer("admits", torch.zeros(n_experts),
                              persistent=False)
         # An expert's NAME is its uid, not its position. Position changes
@@ -272,26 +264,31 @@ class PagedPool(nn.Module):
         self.register_buffer("uid", torch.arange(n_experts, dtype=torch.long),
                              persistent=False)
         self.next_uid = int(n_experts)
-        self.key_weight = 1.0
-        # How much an expert that has earned nothing may still be wanted for
-        # its fit alone - low, but not zero, or growth could never take. The
-        # value in effect comes from pool.key_floor in config.yaml, applied by
-        # build_paged; this is the fallback for a pool built without it.
-        self.key_floor = 0.1
-        # A new expert cannot lift its gate without being chosen, and would not
-        # be chosen because its gate is low - a loop that deletes every new
-        # expert and leaves only the originals. So a new expert competes
-        # without the handicap for its first `trial` steps, which is the same
-        # window prune gives it before it may be deleted, and is then judged on
-        # what it did with a fair turn rather than on never having had one.
-        # `now` is the training step, set by the reader; without it nothing is
-        # ever on trial, which is the safe default.
+        # A newborn is safe from pruning for its first `trial` steps; `now` is
+        # the training step, set by the reader. Without it nothing is ever on
+        # trial, which is the safe default.
         self.trial = 0
         self.now = 0
         # share of the survival window unaddressed that counts as dying
         self.dying_at = 0.75
-        self._keys_built = False
-        self._h_keep = None
+        # the experts the current forward has admitted - see admit()
+        self._admitted = set()
+        self._mask = None
+        self.loads = 0            # experts brought onto the card, ever
+        # EXPLORATION, while training. Each expert's share of recent training
+        # forwards that admitted it, and the bonus its selection score gets
+        # for being used less than its fair share: explore_bias * exp(-share
+        # / fair share), fair share being resident / experts. Computed once
+        # per training forward; None in every other forward. See begin_forward.
+        self.register_buffer("recent", torch.zeros(n_experts),
+                             persistent=False)
+        self.explore_bias = 0.0          # the bonus at zero use, in logits
+        self.explore_steps = 1000.0      # how far back `recent` looks
+        self._bias = None
+        self._exploring = False
+        # what the router alone would have admitted this forward - the only
+        # admissions the prune clock counts
+        self._merited = set()
 
     def _f(self, i):
         """Position in the pool's arrays -> the id its file is named by."""
@@ -329,9 +326,8 @@ class PagedPool(nn.Module):
         if window <= 0:
             return z
         # An expert cannot have gone unaddressed for longer than it has
-        # existed. `last_seen` starts at 0 for a newborn - deliberately, so it
-        # sorts to the front of the exploration queue - but read here as "how
-        # long since anything wanted it" that same 0 would mean "since the
+        # existed. `last_seen` starts at 0 for a newborn, and read as "how
+        # long since anything wanted it" that 0 would mean "since the
         # beginning of the run". Clamping to the expert's own age is what stops
         # a newborn scoring past the prune line from the moment it exists.
         born_seg = (step - self.born[:n].to(z.dtype)).clamp_min(0.0) * per_step
@@ -404,7 +400,7 @@ class PagedPool(nn.Module):
 
     def n_params(self):
         per = 3 * self.d_model * self.d_ff
-        return self._n * per + self.gate.numel() + self.segment_router.weight.numel()
+        return self._n * per + self.gate.numel()
 
     def disk_bytes(self, extra=0):
         """
@@ -424,7 +420,7 @@ class PagedPool(nn.Module):
 
     def vram_params(self):
         return (3 * self.resident * self.d_model * self.d_ff
-                + self.gate.numel() + self.segment_router.weight.numel())
+                + self.gate.numel())
 
 
     def stacked(self):
@@ -433,371 +429,134 @@ class PagedPool(nn.Module):
     def invalidate(self):
         pass
 
-    # -- choosing and swapping the working set -----------------------------
-    @staticmethod
-    @torch.no_grad()
-    def _key_of(w1, iters=4):
-        """Dominant input direction of an expert, by power iteration."""
-        v = w1.sum(0)
-        if not torch.isfinite(v).all() or float(v.norm()) < 1e-9:
-            v = torch.randn(w1.shape[1], device=w1.device, dtype=w1.dtype)
-        v = v / v.norm().clamp_min(1e-9)
-        for _ in range(iters):
-            v = w1.t() @ (w1 @ v)
-            v = v / v.norm().clamp_min(1e-9)
-        return v
+    # -- admission: which experts a forward may use ----------------------
+    #
+    # While the card has room, every character, at every pass, ranks the WHOLE
+    # pool with the router and asks for its top_k (see PooledMLP.forward).
+    # Once it is full the whole-pool ranking is no longer computed: nothing
+    # more could be admitted, and routing needs only the admitted rows.
+    #
+    # A forward may use at most `resident` different experts, because
+    # everything it used must still be on the card for its backward and for
+    # the optimiser step. So the experts are admitted as the requests arrive:
+    # at each pass, the requested experts not yet admitted are taken in order
+    # of how much router probability the requests carried, until the card is
+    # full. Nothing admitted is evicted before the forward ends, and the next
+    # forward starts with nothing admitted.
+    #
+    # For a training window the first pass alone asks for far more than
+    # `resident` experts, so the window's set is its first pass's most
+    # requested. A character being written asks for top_k at each pass, so
+    # its forward admits pass by pass, as many as its passes ask for, up to
+    # the card's slots.
+    #
+    # What is computed depends only on the text and the weights: the ranking
+    # never looks at what is already on the card. Residency only decides how
+    # many admitted experts have to be copied in.
 
-    @torch.no_grad()
-    def build_keys(self, verbose=False):
+    def begin_forward(self, explore=False):
         """
-        Describe every expert on disk, once, at startup.
+        A new forward: nothing admitted yet. The card keeps its contents.
 
-        Only w1 is read from each file - the rest of the expert is not needed
-        to say what it responds to - so this costs a fraction of loading the
-        pool, and it is what lets an expert that has never been resident be
-        asked for at all.
+        `explore` is set for a forward that trains. Its selection bonus is fixed
+        here, from how much each expert has been used, and holds for the whole
+        forward - its backward recomputes the same choices - and `recent`
+        decays one step, to be topped up by what this forward admits.
         """
-        import numpy as _np
-        done = 0
-        for i in range(self._n):
-            f = self.tiers._file(self._f(i))
-            if not os.path.exists(f):
-                continue
-            ent = self.tiers.ram.get(self._f(i))
-            if ent is not None:
-                w1 = ent["w1"]
-                self.keys[i] = self._key_of(w1.float().to(self.keys.device))
-            else:
-                # close the archive on every iteration. Left to the garbage
-                # collector, one open member per expert is held at once and
-                # describing the pool costs more memory than loading it.
-                with _np.load(f) as z:
-                    w1 = torch.from_numpy(_np.ascontiguousarray(z["w1"]))
-                self.keys[i] = self._key_of(w1.float().to(self.keys.device))
-                del w1
-            done += 1
-        self._keys_built = True
-        if verbose:
-            print(f"  described {done} experts by what they respond to")
-        return done
+        self._admitted = set()
+        self._merited = set()
+        self._mask = None
+        self._bias = None
+        self._exploring = bool(explore and self.explore_bias > 0)
+        if self._exploring:
+            n = self._n
+            fair = self.resident / max(n, 1)
+            self._bias = (self.explore_bias
+                          * torch.exp(-self.recent[:n] / fair)).to(
+                              self.gate.device, torch.float32)
+            self.recent[:n] *= 1.0 - 1.0 / self.explore_steps
 
-    @torch.no_grad()
-    def refresh_keys(self):
-        """Recompute keys for whichever experts are on the card right now."""
-        for slot, e in enumerate(self.slots):
-            if 0 <= e < self.keys.shape[0]:
-                self.keys[e] = self._key_of(self.w1.data[slot].float())
-
-    def arm_observation(self):
-        """Start collecting the states the call sites route on."""
-        self._h_keep = []
-
-    def demand(self, x, sites, top_k):
-        """
-        Which experts the text wants, scored over the WHOLE pool.
-
-        The states matter more than anything else here. Scoring the routers on
-        raw character embeddings looks reasonable and is useless: an embedding
-        carries no context, so every subject asks for very nearly the same
-        experts. What a character means depends on what surrounds it, and only
-        the hidden state knows that.
-
-        So demand is scored on the states the call sites really routed on
-        while reading the previous chunk, sampled as they went. They are one
-        chunk stale, which is the price of knowing anything at all: what the
-        next chunk wants cannot be known without computing it, and text is
-        locally coherent enough that what the last few hundred characters
-        needed is a fair guess at what the next few hundred will.
-        """
-        if not self._keys_built:
-            # built on first use, not at load: a tool that never routes - the
-            # film's captures, an inspector - should not pay for reading every
-            # expert on disk just to open the model
-            self.build_keys()
-        want = torch.zeros(self._n, device=self.gate.device)
-        k = min(top_k, self._n)
-        seen = getattr(self, "_h_keep", None)
-        if seen:
-            pairs = seen
-        else:
-            # nothing has been read yet, so the embedding is all there is
-            flat = x.reshape(-1, x.shape[-1])
-            pairs = [(s, flat) for s in sites]
-        for s, h in pairs:
-            w = s.router.weight[:self._n]
-            lg = F.linear(h.to(w.dtype) + s.depth_emb.to(w.dtype), w).float()
-            top = torch.topk(torch.softmax(lg, -1), k, dim=-1)
-            want.index_add_(0, top.indices.reshape(-1),
-                            top.values.reshape(-1).to(want.dtype))
-        self._h_keep = []                       # consumed
-
-        # The router can only speak for the experts it has been trained on,
-        # which are the ones already resident. The keys speak for all of them,
-        # because a key belongs to the expert rather than to the scheduler.
-        if self.key_weight and float(self.keys.abs().sum()) > 0:
-            hs = torch.cat([h.float() for _, h in pairs]) if pairs else None
-            if hs is not None and hs.numel():
-                hs = hs / hs.norm(dim=-1, keepdim=True).clamp_min(1e-6)
-                kk = self.keys[:self._n]
-                kk = kk / kk.norm(dim=-1, keepdim=True).clamp_min(1e-6)
-                sim = torch.softmax((hs @ kk.t()).abs() * 8.0, dim=-1)
-                # What an expert has earned scales the similarity BEFORE the
-                # per-character choice, not the tally afterwards: discounting
-                # the tally would still let an untrained expert win the choice
-                # and only then be marked down, and a single strong random
-                # match would outweigh the penalty.
-                g = self.gate.detach().abs()[:self._n]
-                earned = (g / g.max().clamp_min(1e-9)).clamp_min(self.key_floor)
-                # ...except while an expert is on trial. See __init__: an
-                # expert born into this handicap can never escape it, because
-                # the gate it is judged on only moves when it is chosen. Born
-                # experts carry born > 0; the originals carry 0 and are never
-                # young, so a fresh pool waives nothing.
-                if self.trial > 0:
-                    born = self.born[:self._n]
-                    young = (born > 0) & ((self.now - born) < self.trial)
-                    earned = torch.where(young, torch.ones_like(earned), earned)
-                # WHAT THE TEXT WANTS, BEFORE ANY DISCOUNT. `sim` here is
-                # fit alone; a line below it is multiplied by `earned` and an
-                # expert that has earned nothing disappears under it. That
-                # discounted number is right for choosing a working set and
-                # useless for choosing who to audition, which is precisely a
-                # question about the experts the discount is burying.
-                raw = torch.zeros_like(want)
-                rtop = torch.topk(sim, k, dim=-1)
-                raw.index_add_(0, rtop.indices.reshape(-1),
-                               rtop.values.reshape(-1).to(raw.dtype))
-                self._fit_raw = raw
-                self._suppressed = earned <= self.key_floor + 1e-6
-
-                sim = sim * earned
-                top = torch.topk(sim, k, dim=-1)
-                fit = torch.zeros_like(want)
-                fit.index_add_(0, top.indices.reshape(-1),
-                               top.values.reshape(-1).to(fit.dtype))
-                # Fit is not enough on its own. A brand new expert's key comes
-                # from its random w1, which matches text about as well as
-                # anything does, so fit alone elects the untrained - and an
-                # expert gated to nothing contributes nothing while still
-                # taking one of the top-k slots at that depth.
-                #
-                # So an expert is wanted in proportion to how well it fits AND
-                # how much it has shown it can contribute. `key_floor` is what
-                # keeps a new expert reachable at all; the cold-start sweep in
-                # choose_by_demand() is what gives it its first turn.
-                #
-                # Each term is normalised on its own, so that where the router
-                # has no opinion the key term still speaks.
-                want = (want / want.sum().clamp_min(1e-9)
-                        + self.key_weight * fit / fit.sum().clamp_min(1e-9))
-        # an expert that has earned a gate is worth keeping resident over one
-        # that has not, when demand is otherwise equal
-        return want + 0.05 * self.gate.detach().abs()
-
-    @torch.no_grad()
-    def choose_by_demand(self, want):
-        """
-        Which experts should be resident, decided by need rather than a clock.
-
-        Nothing moves unless something asks for it. A candidate displaces a
-        resident only when it is wanted enough to beat it by `margin`, and a
-        resident that has only just arrived cannot be thrown out again before
-        it has had `dwell` chunks to be useful. On text that has not changed,
-        this settles to no movement at all; when the subject turns over, a
-        burst of admissions happens because the demand really did change.
-
-        The one thing that is not demand-driven is the cold start, and it is
-        deliberately finite. An expert that has never been resident has never
-        trained, so its router row is noise and it can never be wanted - the
-        pool would collapse to whatever an untrained router liked first, and
-        most of the experts on disk would never be loaded even once.
-        So while any expert has never been resident, exactly one is
-        admitted per chunk, in index order. Once every expert has had its
-        turn the sweep stops for good, and growth re-arms it only for the
-        experts it just created. No randomness, and no permanent tax.
-        """
-        k = min(self.n_routable(), self._n)
-        if self.ever.numel() < self._n:                 # grown since last time
-            self.ever = torch.cat([
-                self.ever, torch.zeros(self._n - self.ever.numel(),
-                                       dtype=torch.bool, device=self.ever.device)])
-        # AN AUDITION LASTS ONE CHUNK. Whoever was auditioned last time gives
-        # the slot back now and has to win it through the ordinary path like
-        # anything else. Without this they simply become incumbents, `margin`
-        # keeps them, and the next swap_to counts them as an ordinary resident
-        # and resets the prune clock - which is how the first version of this
-        # made the pool immortal while looking correct on a single swap.
-        prev_aud = set(getattr(self, "_auditioned", ()) or ())
-        cur = [e for e in self.slots if e >= 0]
-        if prev_aud and len(cur) >= k:
-            keep = [e for e in cur if e not in prev_aud]
-            order = [int(e) for e in torch.argsort(want, descending=True).tolist()
-                     if e not in keep]
-            cur = (keep + order)[:k]          # vacated slots go to what is wanted
-        if len(cur) < k:                                # cold card: fill it
-            order = torch.argsort(want, descending=True).tolist()
-            cur = (cur + [e for e in order if e not in cur])[:k]
-            return cur
-
-        held = set(cur)
-        score = want.clone()
-        # a resident that has just arrived is not up for eviction yet
-        young = [e for e in cur
-                 if self.segments - float(self.since[e]) < self.dwell]
-        evictable = [e for e in cur if e not in young]
-        cands = [int(e) for e in torch.argsort(want, descending=True).tolist()
-                 if e not in held]
-
-        plan = list(cur)
-        for cand in cands:
-            if not evictable:
-                break
-            weakest = min(evictable, key=lambda e: float(score[e]))
-            if float(score[cand]) <= float(score[weakest]) * (1.0 + self.margin):
-                break                                   # nothing wants in
-            plan[plan.index(weakest)] = cand
-            evictable.remove(weakest)
-
-        # the terminating cold-start sweep: one never-resident expert, in
-        # index order, into the least wanted slot that may be evicted
-        never = (~self.ever).nonzero().flatten().tolist()
-        never = [e for e in never if e not in plan]
-        if never and evictable:
-            weakest = min(evictable, key=lambda e: float(score[e]))
-            plan[plan.index(weakest)] = never[0]
-            evictable.remove(weakest)
-
-        # AUDITIONS. Nothing above ever favours an expert because it has been
-        # idle: demand scales fit by what an expert has earned, and `margin`
-        # makes incumbency sticky on top of that, so an expert that falls off
-        # the card stops training its router row and cannot argue for itself
-        # again. It then ages out and is pruned - having failed by never
-        # being asked rather than by being asked and adding nothing.
-        #
-        # An audition is one slot, given to whichever expert has gone longest
-        # without a turn. It buys a hearing, not a reprieve: swap_to leaves
-        # last_seen alone for these, so an expert that earns nothing keeps
-        # ageing and is still pruned on schedule. Only being genuinely wanted
-        # resets that clock.
-        self._auditioned = ()
-        if self.audition_slots and evictable and not never:
-            free = [e for e in range(self._n) if e not in plan]
-            raw, sup = self._fit_raw, self._suppressed
-            if free and raw is not None and sup is not None:
-                # THE ONES THE DISCOUNT IS BURYING. An expert is worth a
-                # hearing when this text wants it and the only thing in its
-                # way is that it has earned nothing - not merely because it
-                # has been idle a long time, which says nothing about whether
-                # it is any use here. Ranked by undiscounted fit, restricted
-                # to those sitting on the key_floor.
-                pick = [e for e in free if bool(sup[e])]
-                pick.sort(key=lambda e: -float(raw[e]))
-                picked = []
-                for e in pick[:int(self.audition_slots)]:
-                    if not evictable or float(raw[e]) <= 0:
-                        break
-                    weakest = min(evictable, key=lambda q: float(score[q]))
-                    plan[plan.index(weakest)] = e
-                    evictable.remove(weakest)
-                    self.last_try[e] = self.segments
-                    picked.append(e)
-                self._auditioned = tuple(picked)
-        return plan[:k]
-
-    @torch.no_grad()
-    def choose(self, summary=None):
-        """
-        Which experts to hold next, scored on the segment just finished.
-
-        Most of the working set is what the router asks for. A share of it -
-        `explore` - goes to the experts that have gone longest without being
-        resident, whatever the router thinks of them.
-
-        That reservation is not a nicety. Selection here is self-reinforcing:
-        an expert that is not chosen does not train, so its gate does not
-        rise, so it is chosen even less, and the age rule eventually deletes
-        it. Without exploration the pool shrinks to whichever experts an
-        untrained router happened to prefer on the first segment, and the rest
-        of the disk is dead weight.
-        """
-        s = self.summary if summary is None else summary
-        logits = self.segment_router(s)[:self._n].clone()
-        logits = logits + 0.5 * self.gate.detach().abs().log1p()
-        k = min(self.n_routable(), self._n)
-        n_explore = min(int(k * self.explore), max(self._n - k, 0))
-        chosen = torch.topk(logits, k - n_explore).indices.tolist()
-        if n_explore:
-            stale = self.last_seen.clone()
-            stale[torch.tensor(chosen, device=stale.device)] = float("inf")
-            # longest unseen first; ties broken by index, which is stable
-            order = torch.argsort(stale)[:n_explore].tolist()
-            chosen = chosen + order
-        return chosen[:k]
-
-    @torch.no_grad()
-    def swap_to(self, ids):
-        """
-        Make `ids` the resident set, moving optimiser state with the weights.
-
-        Adam's moments belong to the expert. Leaving them behind would hand an
-        expert's momentum to whatever took its slot, and training would carry
-        on looking healthy while every swapped expert inherited a stranger's
-        history.
-        """
-        ids = list(dict.fromkeys(int(i) for i in ids))[:self.resident]
-        while len(ids) < self.resident:
-            for cand in range(self._n):
-                if cand not in ids:
-                    ids.append(cand)
-                    break
-            else:
-                break
+    def begin_text(self, explore=False):
+        """A forward from position 0: a new text, which the prune clock counts."""
+        self.begin_forward(explore)
         self.segments += 1
-        for i in ids:                       # newly admitted start their dwell
-            if 0 <= i < self.since.numel() and i not in self.slots:
-                self.since[i] = self.segments
-                self.admits[i] += 1
-        if self.segments % 8 == 0:
-            # a resident expert is still learning, so its description drifts
-            self.refresh_keys()
-        # AN AUDITION IS NOT A REPRIEVE. last_seen is the clock prune deletes
-        # on, so resetting it here for an expert that was admitted because it
-        # had been idle - rather than because anything wanted it - would make
-        # the pool immortal: every dead expert would be auditioned, look
-        # freshly seen, and never be removed. It keeps ageing; only a normal
-        # admission, which means demand actually asked for it, stops that.
-        audition = set(getattr(self, "_auditioned", ()) or ())
-        for i in ids:
-            if 0 <= i < self.last_seen.numel():
-                if i not in audition:
-                    self.last_seen[i] = self.segments
-                self.ever[i] = True
 
-        # An expert already on the card stays in the slot it is in, and only
-        # what is genuinely new is fetched from the host.
-        #
-        # Assigning by position instead - slot j simply gets ids[j] - would
-        # make the same resident set arriving in a different order count as a
-        # full reload. Demand comes back sorted, so the order churns while the
-        # set itself barely moves; matching by identity is what keeps the load
-        # count equal to how much the set really changed.
-        here = {e: s for s, e in enumerate(self.slots) if e >= 0}
-        plan = [-1] * self.resident
-        kept = set()
-        for e in ids:
-            if e in here:
-                plan[here[e]] = e                     # stays where it is
-                kept.add(here[e])
-        free = [s for s in range(self.resident) if s not in kept]
-        for e in ids:
-            if e not in here:
-                plan[free.pop(0)] = e                 # fills a vacated slot
-        if plan == self.slots:
+    def selection_bias(self):
+        """
+        The bonus this forward adds to each expert's router score when choosing,
+        one entry per expert - or None when it is not exploring. It changes
+        which experts are asked for and which a character picks, never how much
+        a picked expert contributes.
+        """
+        return self._bias
+
+    def admitting(self):
+        """Whether this forward may still admit experts."""
+        return len(self._admitted) < self.resident
+
+    @torch.no_grad()
+    def admit(self, mass, merit=None):
+        """
+        Admit the most-requested experts, up to the card's capacity.
+
+        `mass[e]` is the router probability this pass's requests put on
+        expert e. `merit` is the same without the exploration bonus, when
+        there is one: the experts it would have admitted are the ones the
+        prune clock counts, so being tried does not keep an expert alive and
+        being wanted does. Returns how many experts had to be loaded.
+        """
+        mm = (mass if merit is None else merit).detach().float().cpu()
+        mfree = self.resident - len(self._merited)
+        if mfree > 0:
+            morder = torch.argsort(mm, descending=True).tolist()
+            for e in [e for e in morder if float(mm[e]) > 0
+                      and e not in self._merited][:mfree]:
+                self._merited.add(e)
+                self.last_seen[e] = self.segments      # the prune clock
+        adm = self._admitted
+        free = self.resident - len(adm)
+        if free <= 0:
             return 0
+        m = mass.detach().float().cpu()
+        order = torch.argsort(m, descending=True).tolist()
+        new = [e for e in order if float(m[e]) > 0 and e not in adm][:free]
+        if not new:
+            return 0
+        adm |= set(new)
+        here = {e: s for s, e in enumerate(self.slots) if e >= 0}
+        # a newcomer takes a slot holding nothing this forward admitted: an
+        # empty one first, then the one whose expert was admitted longest ago -
+        # the least recently used, which is the one least likely to be wanted
+        # back
+        victims = [s for s, e in enumerate(self.slots) if e < 0 or e not in adm]
+        victims.sort(key=lambda s: (self.slots[s] >= 0,
+                                    float(self.last_seen[self.slots[s]])
+                                    if self.slots[s] >= 0 else -1.0))
+        plan = list(self.slots)
+        for e in new:
+            if e not in here:
+                plan[victims.pop(0)] = e
         loads = sum(1 for e in plan if e >= 0 and e not in here)
-        self._rearrange(plan, here)
-        self.swaps += 1
+        if plan != self.slots:
+            for e in plan:
+                if e >= 0 and e not in here:
+                    self.admits[e] += 1
+            self._rearrange(plan, here)
+            self.swaps += 1
+        for e in new:
+            self.ever[e] = True
+        if self._exploring:
+            self.recent[new] += 1.0 / self.explore_steps
+        self.loads += loads
+        self._mask = None
         return loads
+
+    def admitted_mask(self):
+        """Which slots hold an expert this forward admitted, in slot order."""
+        if self._mask is None:
+            self._mask = torch.tensor([e in self._admitted for e in self.slots],
+                                      device=self.gate.device)
+        return self._mask
 
     @torch.no_grad()
     def _rearrange(self, plan, here):
@@ -805,47 +564,133 @@ class PagedPool(nn.Module):
         Put the card into the state `plan` describes: park what is leaving,
         fetch what is arriving, and leave everything else where it is.
 
-        Adam's moments travel with the expert in both directions, because they
-        belong to the expert and not to the slot it occupied.
+        An arriving expert brings its weights and nothing else. Its moments
+        belong to it as much as its weights do, but only an optimiser step
+        reads them, so they come to the card just before one - _own_moments -
+        and only for the experts on the card at that moment. A reply loads
+        experts at almost every character and steps none of them; carrying
+        their moments as well would double what each load copies, for nothing.
+
+        An expert that nothing has trained since it was loaded is still exactly
+        its copy in RAM or on disk, so parking it copies nothing back - a
+        reply written one character at a time loads experts constantly and
+        changes none of them, and writing them back would put every one of
+        those loads on the disk a second time for nothing. One that was
+        stepped goes back with its weights and its moments.
         """
         st = (self._opt.state if self._opt is not None else {})
-        dev = self.w1.device
         tensors = ((self.w1, "w1"), (self.w3, "w3"), (self.w2, "w2"))
         old = list(self.slots)
+        now = self._slot_state()
 
         for e in old:
             if e >= 0 and e not in plan:
                 s = here[e]
-                if e < self.keys.shape[0]:
-                    # its weights are final for this stay, so this is the
-                    # moment its description is most accurate
-                    self.keys[e] = self._key_of(self.w1.data[s].float())
-                ent = {nm: p.data[s].detach().to("cpu").clone()
-                       for p, nm in tensors}
-                for p, nm in tensors:
-                    o = st.get(p)
-                    if o and "exp_avg" in o:
-                        ent[nm + "_m"] = o["exp_avg"][s].to("cpu").clone()
-                        ent[nm + "_v"] = o["exp_avg_sq"][s].to("cpu").clone()
-                self.tiers.put(self._f(e), ent, dirty=True)
+                if self._loaded_at[s] == now:
+                    continue                  # unchanged since it was loaded
+                self.tiers.put(self._f(e), self._entry(s, e, st), dirty=True)
 
         for s, e in enumerate(plan):
             if e < 0 or old[s] == e:
                 continue
             src = self.tiers.fetch(self._f(e))
-            src = {k: (v.to(dev) if torch.is_tensor(v) else v)
-                   for k, v in src.items()}
             for p, nm in tensors:
-                p.data[s] = src[nm]
+                p.data[s].copy_(src[nm])
+            self._own[s] = False
+        now = self._slot_state()
+        for s, e in enumerate(plan):
+            if e >= 0 and old[s] != e:
+                self._loaded_at[s] = now
+        self.slots = list(plan)
+
+    def _entry(self, s, e, st):
+        """
+        Slot s as expert e's entry in RAM: its weights, and its moments - the
+        optimiser's when they are its own there, which they are for every
+        expert a step has touched, and otherwise the ones its entry already
+        holds. An entry replaces the old one whole, so it never leaves them out.
+        """
+        tensors = ((self.w1, "w1"), (self.w3, "w3"), (self.w2, "w2"))
+        ent = {nm: p.data[s].detach().to("cpu").clone() for p, nm in tensors}
+        if self._own[s]:
+            for p, nm in tensors:
                 o = st.get(p)
                 if o and "exp_avg" in o:
-                    if nm + "_m" in src:
-                        o["exp_avg"][s] = src[nm + "_m"]
-                        o["exp_avg_sq"][s] = src[nm + "_v"]
-                    else:
-                        o["exp_avg"][s].zero_()
-                        o["exp_avg_sq"][s].zero_()
-        self.slots = list(plan)
+                    ent[nm + "_m"] = o["exp_avg"][s].to("cpu").clone()
+                    ent[nm + "_v"] = o["exp_avg_sq"][s].to("cpu").clone()
+        else:
+            ent.update({k: v for k, v in
+                        self.tiers.fetch(self._f(e), count=False).items()
+                        if is_moment(k)})
+        return ent
+
+    def _moment_state(self):
+        """The optimiser's state for the three slot tensors - or None with no
+        optimiser, or before its first step has created the moments."""
+        if self._opt is None:
+            return None
+        sts = [self._opt.state.get(p) for p in (self.w1, self.w3, self.w2)]
+        return sts if all(o and "exp_avg" in o for o in sts) else None
+
+    @torch.no_grad()
+    def _own_moments(self, *_):
+        """
+        Before every optimiser step: each expert on the card holds its own
+        moments, and one that does not yet gets them now.
+
+        AdamW steps every slot, used or not, so every expert on the card at a
+        step is stepped, and it must be stepped with its own history. An
+        arriving expert brought only its weights, so its moments are copied in
+        here from its entry in RAM or on disk - the latest it has, because
+        nothing has stepped it since it was loaded. From then until another
+        expert takes the slot, the step keeps them its own.
+
+        Moments filled into tensors the optimiser has since replaced are
+        nobody's: a restore from optim.npz writes the slot-indexed moments of
+        whichever experts sat in the slots when it was saved, so after one
+        every slot is filled again. Before an optimiser's first step there
+        are no moment tensors to fill; Adam creates them, at zero, in it.
+        """
+        sts = self._moment_state()
+        if sts is None:
+            return
+        if self._own_in is None or any(r() is not o["exp_avg"]
+                                       for r, o in zip(self._own_in, sts)):
+            self._own = [False] * self.resident
+        names = ("w1", "w3", "w2")
+        for s, e in enumerate(self.slots):
+            if e < 0 or self._own[s]:
+                continue
+            src = self.tiers.fetch(self._f(e), count=False)
+            for nm, o in zip(names, sts):
+                if nm + "_m" in src:
+                    o["exp_avg"][s].copy_(src[nm + "_m"])
+                    o["exp_avg_sq"][s].copy_(src[nm + "_v"])
+                else:
+                    o["exp_avg"][s].zero_()
+                    o["exp_avg_sq"][s].zero_()
+            self._own[s] = True
+        self._own_in = [weakref.ref(o["exp_avg"]) for o in sts]
+
+    def _slot_state(self):
+        """
+        What changes when the slots are trained: the slot tensors' version
+        counters, which every optimiser step on them moves, and the optimiser
+        steps seen - the second in case an optimiser writes the slots without
+        moving the counters. Loading writes through .data, which moves
+        neither, so a slot's state at load is what it is compared against.
+        """
+        return (self.w1._version, self.w3._version, self.w2._version,
+                self._stepped)
+
+    def _count_step(self, *_):
+        self._stepped += 1
+        # whatever each slot's moments were going in - its own, or the zeros
+        # an optimiser's first step starts from - they are its expert's now
+        sts = self._moment_state()
+        if sts is not None:
+            self._own = [e >= 0 for e in self.slots]
+            self._own_in = [weakref.ref(o["exp_avg"]) for o in sts]
 
     # -- growing and pruning ----------------------------------------------
     @torch.no_grad()
@@ -854,10 +699,10 @@ class PagedPool(nn.Module):
         """
         Write k new experts to disk and make them part of the pool.
 
-        They are not loaded. A new expert only reaches VRAM if the segment
-        router chooses it. Growth is therefore cheap in a way it never was
-        while every expert had to be resident: adding a hundred experts costs
-        a hundred files and not one megabyte of card.
+        They are not loaded. A new expert only reaches VRAM if a forward admits
+        it. Growth is therefore cheap in a way it never was while every expert
+        had to be resident: adding a hundred experts costs a hundred files and
+        not one megabyte of card.
 
         HOW ONE IS BUILT is RECOMBINATION, by default from `recombine` other
         experts. A hidden unit is the triple (w1[u], w3[u], w2[:, u]) and units
@@ -874,10 +719,14 @@ class PagedPool(nn.Module):
 
         A new expert is born at `birth_gate`, a small starting scale rather
         than a verdict: prune reads staleness, not the gate, so what keeps a
-        newborn alive is its trial window and then being chosen.
+        newborn alive is its trial window and then being asked for.
 
-        The per-character router does not change size - it addresses slots,
-        not experts. Only the segment router gains a row each.
+        ITS ROUTER ROW IS ITS PARENTS'. Every router gains a row per newborn,
+        and that row is the average of the rows of the experts its units came
+        from, weighted by how many units each gave. A row is what decides
+        whether any text ever asks for the expert, and a random one is asked
+        for by chance or not at all: this one is asked for where its parents
+        are, which is where its units already know what to do.
         """
         dev = self.gate.device
         src = None
@@ -898,6 +747,7 @@ class PagedPool(nn.Module):
             srcs = tuple(torch.stack([g[nm].float() for g in got])
                          for nm in ("w1", "w3", "w2"))
         new_uids = []
+        lineage = []              # per child: (parent positions, unit shares)
         for _ in range(k):
             i = self._n
             nu = self.next_uid
@@ -908,6 +758,8 @@ class PagedPool(nn.Module):
                 # tools/birth_probe.py.
                 ent = {nm: t.detach().clone()
                        for nm, t in zip(("w1", "w3", "w2"), make(i, src))}
+                lineage.append((torch.tensor([int(seed_from)]), torch.ones(1))
+                               if src is not None else None)
             elif srcs is not None:
                 # RECOMBINATION. A hidden unit is (w1[u], w3[u], w2[:, u]) and
                 # units are interchangeable, so taking whole units from
@@ -918,13 +770,18 @@ class PagedPool(nn.Module):
                 ent = {"w1": srcs[0][who, unit].clone(),
                        "w3": srcs[1][who, unit].clone(),
                        "w2": srcs[2][who, :, unit].t().contiguous().clone()}
+                share = torch.bincount(who, minlength=srcs[0].shape[0]).float()
+                lineage.append((torch.tensor(pick), share / share.sum()))
             elif src is not None:
                 ent = {nm: (src[nm] + 0.02 * torch.randn_like(src[nm])).clone()
                        for nm in ("w1", "w3", "w2")}
+                lineage.append((torch.tensor([int(seed_from)]),
+                                torch.ones(1)))
             else:
                 ent = {"w1": torch.randn(self.d_ff, self.d_model) * 0.02,
                        "w3": torch.randn(self.d_ff, self.d_model) * 0.02,
                        "w2": torch.randn(self.d_model, self.d_ff) * 0.02}
+                lineage.append(None)
             self.tiers.put(nu, ent, dirty=True)
             new_uids.append(nu)
             self._n += 1
@@ -940,41 +797,32 @@ class PagedPool(nn.Module):
         old_gate = self.gate
         self.gate = nn.Parameter(grow_vec(self.gate.data, birth_gate))
         self._carry(opt, old_gate, self.gate, grow=k)
-        # a new expert has never been seen, so it goes to the front of the
-        # exploration queue rather than the back
         self.last_seen = grow_vec(self.last_seen, 0.0)
-        self.last_try = grow_vec(self.last_try, 0.0)
         self.use = grow_vec(self.use)
         self.age = grow_vec(self.age)
         self.born = grow_vec(self.born, step)
         self.gate_seen = grow_vec(self.gate_seen)
-        # a new expert has never been resident, which re-arms the cold-start
-        # sweep for it alone - it will get its turn on the card, in order,
-        # and then the sweep goes quiet again
         self.ever = torch.cat([self.ever, torch.zeros(k, dtype=torch.bool,
                                                       device=self.ever.device)])
-        self.keys = torch.cat([self.keys, torch.zeros(k, self.d_model,
-                                                      device=self.keys.device,
-                                                      dtype=self.keys.dtype)])
-        self.since = grow_vec(self.since, 0.0)
         self.admits = grow_vec(self.admits, 0.0)
+        # a newborn has been used by nothing, so it starts with the whole bonus
+        self.recent = grow_vec(self.recent, 0.0)
 
-        w = self.segment_router.weight.data
-        if w.shape[0] < self._n:
-            extra = torch.randn(self._n - w.shape[0], self.d_model,
-                                device=w.device) * 0.02
-            old_sr = self.segment_router.weight
-            self.segment_router = nn.Linear(self.d_model, self._n,
-                                            bias=False).to(dev)
-            self.segment_router.weight.data = torch.cat([w, extra])
-            self._carry(opt, old_sr, self.segment_router.weight,
-                        grow=self._n - w.shape[0])
-        # the per-token routers also keep one row per expert, so they grow too
+        # the routers keep one row per expert, so they grow too - each new
+        # row the unit-weighted average of its parents' rows (see above)
         for site in self._sites:
             rw = site.router.weight.data
             if rw.shape[0] < self._n:
-                extra = torch.randn(self._n - rw.shape[0], self.d_model,
-                                    device=rw.device) * 0.01
+                rows = []
+                for spec in lineage:
+                    if spec is None:
+                        rows.append(torch.randn(self.d_model, device=rw.device,
+                                                dtype=rw.dtype) * 0.01)
+                    else:
+                        who_, share = spec
+                        rows.append(share.to(rw.device, rw.dtype)
+                                    @ rw[who_.to(rw.device)])
+                extra = torch.stack(rows)
                 old_r = site.router.weight
                 site.router = nn.Linear(self.d_model, self._n,
                                         bias=False).to(rw.device)
@@ -1002,7 +850,7 @@ class PagedPool(nn.Module):
         anti-predictive: the smallest gates belong to the busiest experts. One
         that behaves as a sink - chosen constantly, contributing little per
         character - reads as dead on a gate test, while a high-gate expert
-        nothing has asked for in hundreds of thousands of segments reads as
+        nothing has asked for in hundreds of thousands of texts reads as
         alive. A gate test would delete the first and spare the second.
 
         The growth brake reads the SAME staleness, through dying(): an expert
@@ -1011,14 +859,13 @@ class PagedPool(nn.Module):
         growth, one that deletes.
 
         A newborn is safe for `survival` steps no matter what, so it cannot be
-        judged before it has had a chance to be chosen; the exploration reserve
-        in choose() reaches every expert well inside that window.
+        judged before texts have had the chance to ask for it.
 
         THE COST OF THIS TRADE is that an expert which is genuinely rare rather
         than dead is deleted, and deletion is permanent. `survival` is the only
         thing holding that, so it should be set wide.
         """
-        # `last_seen` counts SEGMENTS and `survival` is in steps, so the window
+        # `last_seen` counts TEXTS and `survival` is in steps, so the window
         # is converted with the pool's own cumulative ratio rather than a
         # constant - it is self-calibrating and needs nothing stored.
         per_step = self.segments / max(float(step), 1.0)
@@ -1065,21 +912,14 @@ class PagedPool(nn.Module):
         self.gate = nn.Parameter(self.gate.data[idx].clone())
         self._carry(opt, old_gate, self.gate, idx=idx)
         for nm in ("use", "age", "born", "gate_seen", "last_seen", "ever",
-                   "since", "admits", "uid"):
+                   "admits", "uid", "recent"):
             setattr(self, nm, getattr(self, nm)[idx].clone())
-        self.keys = self.keys[idx].clone()
         # Give every router a NEW parameter rather than reshaping the one it
         # has. Autograd sizes a gradient from the tensor it saved, so shrinking
         # a Parameter in place under a graph that still references it makes the
         # backward return the new number of rows where the graph recorded the
         # old one - which is a crash, and only in a run that prunes. Growth
         # never hit it because add_experts already allocates a fresh Linear.
-        old_sr = self.segment_router.weight
-        sr = nn.Linear(self.d_model, len(keep), bias=False).to(
-            old_sr.device)
-        sr.weight.data = old_sr.data[idx].clone()
-        self.segment_router = sr
-        self._carry(opt, old_sr, sr.weight, idx=idx)
         for site in self._sites:
             w = site.router.weight
             fresh = nn.Linear(w.shape[1], len(keep), bias=False).to(w.device)
@@ -1130,8 +970,8 @@ class PagedPool(nn.Module):
                 "use": [float(v) for v in self.use],
                 "admits": [float(v) for v in self.admits],
                 "born": [float(v) for v in self.born],
-                "since": [float(v) for v in self.since],
                 "last_seen": [float(v) for v in self.last_seen],
+                "recent": [round(float(v), 6) for v in self.recent],
                 "ever": [bool(v) for v in self.ever],
                 "uid": [int(v) for v in self.uid],
                 "next_uid": int(self.next_uid),
@@ -1141,8 +981,8 @@ class PagedPool(nn.Module):
         """Put back what a checkpoint carried, ignoring anything resized."""
         if not t:
             return
-        for nm in ("use", "admits", "born", "since", "last_seen",
-                   "gate_seen"):
+        for nm in ("use", "admits", "born", "last_seen",
+                   "gate_seen", "recent"):
             v = t.get(nm)
             if not v:
                 continue
@@ -1167,8 +1007,21 @@ class PagedPool(nn.Module):
         self.segments = int(t.get("segments") or self.segments)
 
     def attach_optimiser(self, opt):
-        """swap_to needs the optimiser to carry moments with experts."""
+        """
+        The optimiser whose steps the experts on the card take part in: before
+        each step every expert on the card gets its own moments
+        (_own_moments), after it the step is counted (_count_step). A
+        different optimiser holds nobody's moments yet, so every slot is
+        filled again before its first step.
+        """
+        if opt is not self._opt:
+            self._own = [False] * self.resident
+            self._own_in = None
         self._opt = opt
+        if opt is not None and id(opt) not in self._hooked:
+            opt.register_step_pre_hook(self._own_moments)
+            opt.register_step_post_hook(self._count_step)
+            self._hooked.add(id(opt))
 
     def attach_sites(self, model):
         """
@@ -1182,26 +1035,16 @@ class PagedPool(nn.Module):
         self._sites = [m for m in model.modules() if isinstance(m, PooledMLP)]
         return len(self._sites)
 
-    @torch.no_grad()
-    def observe(self, h):
-        """Remember what this segment looked like, for the next choice."""
-        self.summary.mul_(0.0).add_(h.detach().float().mean(dim=(0, 1)))
-
     def flush(self):
-        """Park every resident expert, then write everything dirty to disk."""
+        """Park every resident expert that has changed, then write everything
+        dirty to disk. Afterwards each one matches its copy again."""
         st = (self._opt.state if self._opt is not None else {})
+        now = self._slot_state()
         for slot, i in enumerate(self.slots):
-            if i < 0:
+            if i < 0 or self._loaded_at[slot] == now:
                 continue
-            ent = {"w1": self.w1.data[slot].detach().to("cpu").clone(),
-                   "w3": self.w3.data[slot].detach().to("cpu").clone(),
-                   "w2": self.w2.data[slot].detach().to("cpu").clone()}
-            for p, nm in ((self.w1, "w1"), (self.w3, "w3"), (self.w2, "w2")):
-                s = st.get(p)
-                if s and "exp_avg" in s:
-                    ent[nm + "_m"] = s["exp_avg"][slot].to("cpu").clone()
-                    ent[nm + "_v"] = s["exp_avg_sq"][slot].to("cpu").clone()
-            self.tiers.put(self._f(i), ent, dirty=True)
+            self.tiers.put(self._f(i), self._entry(slot, i, st), dirty=True)
+            self._loaded_at[slot] = now
         self.tiers.flush()
 
     def report(self):

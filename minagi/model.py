@@ -129,6 +129,23 @@ class Attention(nn.Module):
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         return self.proj(y)
 
+    def kv(self, x, cos, sin):
+        """These positions' keys and values, as forward() would cache them,
+        with nothing else computed."""
+        B, T, C = x.shape
+        k, v = F.linear(x, self.qkv.weight[C:]).split(C, dim=2)
+        k = k.view(B, T, self.n_head, self.head_dim).transpose(1, 2)
+        v = v.view(B, T, self.n_head, self.head_dim).transpose(1, 2)
+        return apply_rope(k, cos, sin), v
+
+    @staticmethod
+    def extend(cache, k, v):
+        """Append keys and values to a cache, as forward() does."""
+        if cache.get("k") is not None:
+            k = torch.cat([cache["k"], k], dim=2)
+            v = torch.cat([cache["v"], v], dim=2)
+        cache["k"], cache["v"] = k, v
+
 
 class SwiGLU(nn.Module):
     def __init__(self, cfg):
@@ -149,7 +166,11 @@ class Block(nn.Module):
         self.ln2 = RMSNorm(cfg.d_model)
         self.mlp = SwiGLU(cfg)
 
-    def forward(self, x, cos, sin, cache=None):
+    def forward(self, x, cos, sin, cache=None, active=None):
+        """`active` marks the positions still being computed; an expert pool
+        runs its experts for those alone. Attention still reads every
+        position, because the rest are still what later positions see."""
         x = x + self.attn(self.ln1(x), cos, sin, cache)
-        x = x + self.mlp(self.ln2(x))
-        return x
+        if active is not None and getattr(self.mlp, "takes_active", False):
+            return x + self.mlp(self.ln2(x), active)
+        return x + self.mlp(self.ln2(x))

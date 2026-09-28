@@ -303,16 +303,14 @@ class PooledMLP(nn.Module):
         self.top_k, self.site, self.z_weight = top_k, site, z_weight
         # One row per EXPERT, always - never one row per VRAM slot.
         #
-        # Sizing this to the working set is tempting under paging, because a
-        # token only chooses between the experts that are resident. It is also
-        # wrong: slot 5 holds a different expert every segment, so a row that
-        # means "slot 5" learns a preference over positions in the working set,
-        # which are arbitrary. The router would be unable to express "this kind
-        # of character wants that expert" - the one thing it exists to say.
-        #
-        # So the rows belong to experts, and the forward pass reads only the
-        # rows for the experts currently resident. The cost is d_model per
-        # expert, a few megabytes at a thousand experts.
+        # While a forward has room on the card, every character ranks the
+        # whole pool with these rows (that is how a forward asks for experts -
+        # see PagedPool.admit), and every character weighs the ones on the
+        # card with the same rows. A row that meant "slot 5" would mean a
+        # different expert from one forward to the next, and the router
+        # could not express "this kind of character wants that expert" - the
+        # one thing it exists to say. The cost is d_model per expert, a few
+        # megabytes at a thousand experts.
         width = (pool.router_rows() if hasattr(pool, "router_rows")
                  else pool.max_experts)
         self.router = nn.Linear(d_model, width, bias=False)
@@ -342,26 +340,92 @@ class PooledMLP(nn.Module):
     def pool(self):
         return self._pool[0]
 
-    def forward(self, x):
+    # Block.forward passes `active` only to an MLP that says it takes it
+    takes_active = True
+
+    def forward(self, x, active=None):
+        """
+        `active` [B, T] marks the characters still being computed; the rest
+        have halted, and route nowhere. They ask for no experts, take no
+        expert's capacity, and count in none of the statistics or the
+        balancing loss - the pool sees exactly what writing would ask of it.
+        """
+        if active is None or bool(active.all()):
+            return self._route(x)
+        B, T, D = x.shape
+        m = active.reshape(-1)
+        out = torch.zeros(B * T, D, device=x.device, dtype=x.dtype)
+        if bool(m.any()):
+            out[m] = self._route(x.reshape(-1, D)[m].unsqueeze(0))[0]
+        return out.view(B, T, D)
+
+    def _route(self, x):
         # see capture_routes() at the bottom of this file
         B, T, D = x.shape
         p = self.pool
         # how many this token may choose between. For a resident pool that is
-        # every expert; for a paged one it is only what is in VRAM, and the
-        # indices are then into the working set rather than the whole pool.
+        # every expert; for a paged one it is the slots of the card, and the
+        # indices are into the slots rather than the whole pool.
         n = p.n_routable() if hasattr(p, "n_routable") else p.n_experts()
         flat = x.reshape(-1, D)
         rows = p.resident_rows() if hasattr(p, "resident_rows") else None
+        # EXPLORATION, only in a forward that trains: a bonus per expert for
+        # being used less than its fair share (PagedPool.begin_forward). It is
+        # added to the router's scores wherever something is CHOSEN - what a
+        # character asks for, and the top_k it takes - and nowhere else: how
+        # much a chosen expert contributes is always the router's own softmax.
+        bias = p.selection_bias() if hasattr(p, "selection_bias") else None
+        pick = None
         if rows is None:
             logits = self.router(flat + self.depth_emb)[:, :n].float()
         else:
+            if p.admitting():
+                # THE SELECTION RULE, while the forward has room on the card.
+                # Every character ranks the WHOLE pool and asks for its
+                # top_k; each request carries the probability the router gave
+                # it, and the most-asked-for experts are admitted until the
+                # card is full. No gradient: admission decides what is
+                # reachable, the routing below decides weights.
+                with torch.no_grad():
+                    E = p.router_rows()
+                    z = F.linear(flat + self.depth_emb,
+                                 self.router.weight[:E]).float()
+
+                    def requested(scores):
+                        q = F.softmax(scores, -1)
+                        tq = torch.topk(q, min(self.top_k, E), dim=-1)
+                        mass = torch.zeros(E, device=q.device)
+                        mass.index_add_(0, tq.indices.reshape(-1),
+                                        tq.values.reshape(-1).float())
+                        return mass
+                    if bias is None:
+                        mass, merit = requested(z), None
+                    else:
+                        # the bonus decides what is admitted; what the router
+                        # alone would have asked for is kept for the prune
+                        # clock, which counts only that
+                        mass, merit = requested(z + bias[:E]), requested(z)
+                p.admit(mass, merit)
+                rows = p.resident_rows()
             # only the rows belonging to the experts in VRAM, in slot order,
             # so column j of the logits is slot j and row rows[j] is its expert
             w = self.router.weight[rows]                      # [n, d_model]
             logits = F.linear(flat + self.depth_emb, w).float()
+            # a character whose request was not admitted takes its best
+            # admitted expert: slots holding anything else are out of reach
+            logits = logits.masked_fill(~p.admitted_mask(), float("-inf"))
+            if bias is not None:
+                pick = bias[rows]
         probs = F.softmax(logits, dim=-1)
         k = min(self.top_k, n)
-        w, idx = torch.topk(probs, k, dim=-1)
+        if pick is None:
+            w, idx = torch.topk(probs, k, dim=-1)
+        else:
+            # chosen by score plus bonus; weighted by the router's own
+            # probabilities, so the gradient that reaches a chosen expert's
+            # row is the same as if it had been chosen on its score alone
+            idx = torch.topk(logits.detach() + pick, k, dim=-1).indices
+            w = probs.gather(1, idx)
         # the share of the router's distribution that top-k actually captures,
         # measured BEFORE normalisation - afterwards it sums to 1 by
         # construction and carries no information
@@ -395,19 +459,6 @@ class PooledMLP(nn.Module):
                 # the LAST position on its own as well: the mean is a union
                 # over the chunk, so it cannot answer what one character chose
                 self.last_weight_one = sl[-1]
-
-        if getattr(p, "_h_keep", None) is not None and len(p._h_keep) < 64:
-            # A sample of the states this call site actually routed on, for
-            # the next working-set decision. These are hidden states taken at
-            # the depth the routing happened, which is what carries context:
-            # a raw embedding cannot distinguish subjects at all, since the
-            # embedding of "e" is the same in a chess game and a Python file.
-            with torch.no_grad():
-                step_ = max(1, flat.shape[0] // 48)
-                # keep the call site with its states: each one has its own
-                # router, so a state is only meaningful beside the router
-                # that read it
-                p._h_keep.append((self, (flat[::step_]).detach()))
 
         if _ROUTES is not None:
             # which EXPERTS this call-site invocation picked, in the order the
@@ -589,13 +640,12 @@ class AutoGrow:
       from the inside: whether train and held-out have separated, which is what
       memorising looks like. See `growth.max_gap`.
 
-      A new expert is born at a small gate - `growth.birth_gate`, just above
-      the value prune reads as dead - and is on TRIAL for `prune.min_age`
-      steps, during which it competes for the card without a handicap. At the
-      end of the trial prune deletes it unless something is asking for it. Born
-      at exactly zero it could never be selected, so its gate could never move,
-      so it would always be deleted; the small starting gate is what gives each
-      expert one fair turn.
+      A new expert is born at a small gate - `growth.birth_gate` - with its
+      parents' router rows averaged, so it scores every character with the
+      same average of their scores. It is on TRIAL for
+      `prune.survival_chars`, during which prune cannot touch it; at the end
+      of the trial prune deletes it unless it is still being admitted. The
+      gate scales what it contributes, never whether it is asked for.
     """
 
     def __init__(self, grow_k=8, max_experts=1024, dying_frac_max=0.25,

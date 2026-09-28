@@ -195,14 +195,14 @@ def fig_ablation(out):
     Three configurations of the same checkpoint, and the control.
 
     AdEMAMix was tested and dropped - see FINDINGS.md. What is left is one
-    axis, the trunk learning rate, and one architectural ablation: the frozen
-    working set, which is the same model with the pool's defining property
+    axis, the trunk learning rate, and one architectural ablation: frozen
+    experts, which is the same model with the pool's defining property
     switched off. Right panel is progress retained against chance, because
     that is the number that decides whether "catastrophic" is the right word.
     """
     SPECS = [
         (R("static.json"),
-         "working set FROZEN, trunk LR = expert LR", "#3a3a38", "-", 3.0),
+         "experts FROZEN, trunk LR = expert LR", "#3a3a38", "-", 3.0),
         (R("none.json"),
          "swapping normally, trunk LR = expert LR", "#e34948", "-", 2.5),
         (R("trunk01.json"),

@@ -337,13 +337,11 @@ class FolderEvaluator:
     domain, and the files are read in order the way `read` reads them.
     """
 
-    def __init__(self, model, root, chunk, context, device, per_domain=True,
-                 segment_chunks=16):
+    def __init__(self, model, root, chunk, context, device, per_domain=True):
         from minagi.ingest import collect, as_stream
         self._as_stream = as_stream
         self.model, self.chunk, self.context = model, chunk, context
         self.device = device
-        self.segment_chunks = segment_chunks
         self.groups = {}
         subs = [d for d in sorted(os.listdir(root))
                 if os.path.isdir(os.path.join(root, d))] if per_domain else []
@@ -367,30 +365,11 @@ class FolderEvaluator:
                     continue
                 r = FileReader(self.model, data, name, self.chunk,
                                self.context, self.device)
-                seg = 0
+                # Each file is read the way reading measures it: a chunk at a
+                # time through the attention cache. The experts come from the
+                # forward itself - every chunk admits the ones its characters
+                # ask for, and the cache carries the context between them.
                 while len(losses) < chunks and not r.done():
-                    # Choose the working set exactly the way training does: ask
-                    # what the text about to be read wants. Anything else scores
-                    # the model with a working set chosen differently from the
-                    # one it trains with, and the difference lands in held-out
-                    # loss as if it were a property of the model.
-                    # begin_segment is the fallback for a model without peek.
-                    nxt = r.peek() if hasattr(r, "peek") else None
-                    if nxt is not None and hasattr(self.model, "want_experts"):
-                        # seg == 0 opens a new file, so there is no previous
-                        # chunk of this text to score - only the last file's,
-                        # which is a different subject. Scoring on those put a
-                        # working set chosen for the wrong subject into the
-                        # held-out number, exactly the contamination the note
-                        # above is about.
-                        if seg == 0 and hasattr(self.model, "peek_experts"):
-                            self.model.peek_experts(nxt, free=True)
-                        else:
-                            self.model.want_experts(nxt)
-                    elif seg % self.segment_chunks == 0 and hasattr(
-                            self.model, "begin_segment"):
-                        self.model.begin_segment()
-                    seg += 1
                     l = r.step(learn=False)
                     if l is None:
                         break

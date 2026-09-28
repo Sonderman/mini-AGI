@@ -366,7 +366,7 @@ class _Tracer:
 
     Not a reconstruction: this sits inside the training loop, around the same
     forward whose loss is about to be backpropagated, with the same KV cache,
-    the same precision, the same chunk and the same working set. Whatever it
+    the same precision, the same chunk and the same admitted experts. Whatever it
     writes down is what actually happened.
 
     The capture context is exited before backward on purpose. Gradient
@@ -388,14 +388,12 @@ class _Tracer:
         """Swap counts are cheap and run on well past the routes."""
         return self.full() and len(self.swaps) >= self.want_swaps
 
-    def add_swap(self, lane, moved, first, demand_moved=None):
+    def add_swap(self, lane, moved, first):
         """
-        One line per working-set decision, whether or not routes are traced.
+        One line per training step: how many experts its window had to load.
 
         `first` marks the chunk that opens a lane's window - the only place
-        the subject actually changes. If swaps have a reason, they belong
-        here and nowhere else; if they are on a timer, this column will make
-        no difference to the count.
+        the subject actually changes, so the place loads should concentrate.
         """
         self.swaps.append({"subject": lane.name, "moved": int(moved),
                            "first_of_window": bool(first)})
@@ -598,16 +596,6 @@ def cmd_read(args):
     file is read from its beginning to its end rather than sampled at random,
     because a document has an order and the model should see it.
     """
-    # Retired spellings, checked before anything loads. `--dwell` is a strict
-    # prefix of `--dwell-chars` and argparse matches unambiguous prefixes, so
-    # it would be accepted silently and read as characters - an alias that
-    # keeps the name and changes the unit is the exact failure this change
-    # exists to remove.
-    if getattr(args, "dwell_retired", None) is not None:
-        raise SystemExit(
-            "--dwell counted SEGMENTS and is gone. Use --dwell-chars, in "
-            "characters: the old default of 4 is --dwell-chars 2048.")
-
     # EVERY CADENCE IS CONFIGURED IN CHARACTERS AND USED IN STEPS.
     #
     # A step is `--chunk` characters, so anything counted in steps silently
@@ -678,95 +666,10 @@ def cmd_read(args):
           f"{pool.n_params()/1e6:.1f}M total")
     print(f"  computing in {args.precision}; weights stay fp32 everywhere, "
           f"Adam's moments store as bf16")
-    # dwell is configured in characters and counted in segments, one per
-    # working-set decision, which is one per chunk
-    pool.margin = args.margin
-    pool.dwell = max(1, int(args.dwell) // max(1, args.chunk))
-    print(f"  experts move only on demand: a candidate must be wanted "
-          f"{args.margin:.0%} more than the resident it displaces, and a "
-          f"newcomer holds its slot for {args.dwell:,} characters ({pool.dwell} chunks)")
-
-    if args.no_pool_checkpoint:
-        n_off = 0
-        for _s in model.modules():
-            if isinstance(_s, PooledMLP):
-                _s.grad_checkpoint = False
-                n_off += 1
-        print(f"  pool activations kept, not recomputed ({n_off} call sites) "
-              f"- faster, and it needs the memory depth was using")
-    trunk, pool_ps = _split_trunk_pool(model)
-
-    tg = {"params": trunk, "name": "trunk", "weight_decay": args.wd,
-          "lr": args.lr * args.trunk_lr_mult,
-          "base_lr": args.lr * args.trunk_lr_mult}
-    pg = {"params": pool_ps, "name": "pool", "weight_decay": args.wd,
-          "lr": args.lr, "base_lr": args.lr}
-    opt = torch.optim.AdamW([tg, pg], lr=args.lr, betas=(0.9, 0.95),
-                            fused=(device.type == "cuda"))
-    snr = GradSNR()
-    print(f"  trunk learns at {args.trunk_lr_mult:g}x the pool's rate "
-          f"({sum(q.numel() for q in trunk)/1e6:.1f}M trunk, "
-          f"{sum(q.numel() for q in pool_ps)/1e6:.1f}M pool)")
-
-    # Scored at the window the model is actually reading at. A fixed
-    # reference window would be steadier, but it would stop describing the
-    # model as it grows; and because the window moves one character at a time,
-    # two consecutive scores are effectively at the same length anyway. The
-    # sample log states the window with every entry so no comparison is made
-    # blind.
-    # held-out is configured in CHARACTERS per domain and read in chunks
-    eval_steps = max(1, int(args.eval_chunks) // max(1, args.chunk))
-    sample_eval_steps = max(1, int(args.sample_eval_chunks)
-                            // max(1, args.chunk))
-    ev = (FolderEvaluator(model, args.held_out, args.chunk, cfg.block, device,
-                          segment_chunks=max(1, args.segment_chunks
-                                             // max(1, args.chunk)))
-          if args.held_out and os.path.isdir(args.held_out) else None)
-    before = None
-    if ev is not None:
-        v = ev.run(eval_steps); se = v.pop("stderr", 0.0)
-        before = float(np.mean(list(v.values())))
-        print(f"  before: {before:.4f} +/-{se:.4f} on {args.held_out}")
-
-    pool.attach_optimiser(opt)
-    # ADAM'S MOMENTS. They are written to optim.npz at every checkpoint and
-    # were never read back here: this path builds a fresh optimiser and only
-    # ever SAVED it. So every restart threw away 108.9M moment values, 99.9% of
-    # them non-zero, and Adam re-estimated its second moments from a single
-    # gradient - which is a large, badly scaled step in a direction inferred
-    # from one batch, decaying over a few hundred steps. That is the held-out
-    # jump after a restart that then settles, on a model whose whole point is
-    # that it never stops training.
-    #
-    # The tell was in the file: Adam's step counter t read 2,381 at step
-    # 458,000. It counts optimiser steps since the last restart, not since the
-    # run began.
-    #
-    # The pool's w1/w2/w3 moments are slot-indexed and belong to whichever
-    # experts were resident when they were written, but restoring them is safe:
-    # swap_to overwrites a slot's moments from the expert's own file the moment
-    # it is paged in, and zeroes them if the file has none. `pool.gate` is
-    # per-expert and full width, so it restores exactly; a pool that changed
-    # size is caught by the shape guard in _load_optim.
-    try:
-        weights_store._load_optim(opt, model, wdir)
-        t_seen = max((float(st.get("step", 0))
-                      for st in opt.state.values() if "step" in st), default=0)
-        print(f"  optimiser moments restored ({t_seen:,.0f} steps of history)")
-    except Exception as e:                     # never let this stop a run
-        print(f"  [note] optimiser moments not restored: {e}")
-    grower = AutoGrow(grow_k=args.grow_k, max_experts=10_000_000,
-                      mem_frac_max=args.grow_mem_frac,
-                      dying_frac_max=args.grow_dying_frac,
-                      max_in_flight=args.max_in_flight,
-                      keep_ratio_min=args.grow_keep_ratio,
-                      max_disk_gb=args.max_disk_gb,
-                      birth_gate=args.birth_gate,
-                      recent_mult=args.recent_mult) \
-        if args.grow_k else None
     # The checkpoint carries whatever depth policy it was trained under, but
     # this is a knob about how to spend compute now, not a property of the
-    # weights - so config.yaml wins over the manifest every time.
+    # weights - so config.yaml wins over the manifest every time. Applied
+    # before the first held-out check, which the halting settings change.
     cfg.train_steps_mean = float(args.train_steps_mean)
     cfg.min_steps = max(1, min(int(args.min_steps), cfg.max_steps))
     if args.bptt_window:
@@ -777,6 +680,7 @@ def cmd_read(args):
         cfg.halt_prior = float(args.halt_prior)
     if args.halt_thresh:
         cfg.halt_thresh = float(args.halt_thresh)
+    cfg.halt_freeze = bool(args.halt_freeze)
     # The settings above are counted in ROWS, and the CHECKPOINT decides how
     # many rows a step is - n_recur + n_coda. So a config written for one
     # architecture is silently wrong on another, and the failure is not always
@@ -814,8 +718,97 @@ def cmd_read(args):
               ).clamp(cfg.min_steps, cfg.max_steps).float().mean()
         print(f"  recurrence depth is SAMPLED while training: mean {_n:.2f} of "
               f"{cfg.max_steps} ({100*_n/cfg.max_steps:.0f}% of the recurrent "
-              f"compute). Inference still runs all {cfg.max_steps} and lets "
-              f"halting decide.")
+              f"compute). "
+              + (f"A character stops when it halts, in training and in "
+                 f"writing alike." if cfg.halt_freeze else
+                 f"Inference still runs all {cfg.max_steps} and lets halting "
+                 f"decide which row each character keeps."))
+    print(f"  every character ranks all {pool.n_experts()} experts and asks for "
+          f"its top {cfg.pool_top_k}; each forward uses the "
+          f"{pool.n_resident()} it asks for most")
+    if getattr(pool, "explore_bias", 0) > 0:
+        print(f"  while training, an expert used less than its fair share is "
+              f"favoured when choosing: +{pool.explore_bias:g} at no use, "
+              f"fading with use over ~{pool.explore_steps:g} steps")
+
+    if args.no_pool_checkpoint:
+        n_off = 0
+        for _s in model.modules():
+            if isinstance(_s, PooledMLP):
+                _s.grad_checkpoint = False
+                n_off += 1
+        print(f"  pool activations kept, not recomputed ({n_off} call sites) "
+              f"- faster, and it needs the memory depth was using")
+    trunk, pool_ps = _split_trunk_pool(model)
+
+    tg = {"params": trunk, "name": "trunk", "weight_decay": args.wd,
+          "lr": args.lr * args.trunk_lr_mult,
+          "base_lr": args.lr * args.trunk_lr_mult}
+    pg = {"params": pool_ps, "name": "pool", "weight_decay": args.wd,
+          "lr": args.lr, "base_lr": args.lr}
+    opt = torch.optim.AdamW([tg, pg], lr=args.lr, betas=(0.9, 0.95),
+                            fused=(device.type == "cuda"))
+    snr = GradSNR()
+    print(f"  trunk learns at {args.trunk_lr_mult:g}x the pool's rate "
+          f"({sum(q.numel() for q in trunk)/1e6:.1f}M trunk, "
+          f"{sum(q.numel() for q in pool_ps)/1e6:.1f}M pool)")
+
+    # Scored at the window the model is actually reading at. A fixed
+    # reference window would be steadier, but it would stop describing the
+    # model as it grows; and because the window moves one character at a time,
+    # two consecutive scores are effectively at the same length anyway. The
+    # sample log states the window with every entry so no comparison is made
+    # blind.
+    # held-out is configured in CHARACTERS per domain and read in chunks
+    eval_steps = max(1, int(args.eval_chunks) // max(1, args.chunk))
+    sample_eval_steps = max(1, int(args.sample_eval_chunks)
+                            // max(1, args.chunk))
+    ev = (FolderEvaluator(model, args.held_out, args.chunk, cfg.block, device)
+          if args.held_out and os.path.isdir(args.held_out) else None)
+    before = None
+    if ev is not None:
+        v = ev.run(eval_steps); se = v.pop("stderr", 0.0)
+        before = float(np.mean(list(v.values())))
+        print(f"  before: {before:.4f} +/-{se:.4f} on {args.held_out}")
+
+    pool.attach_optimiser(opt)
+    # ADAM'S MOMENTS. They are written to optim.npz at every checkpoint and
+    # were never read back here: this path builds a fresh optimiser and only
+    # ever SAVED it. So every restart threw away 108.9M moment values, 99.9% of
+    # them non-zero, and Adam re-estimated its second moments from a single
+    # gradient - which is a large, badly scaled step in a direction inferred
+    # from one batch, decaying over a few hundred steps. That is the held-out
+    # jump after a restart that then settles, on a model whose whole point is
+    # that it never stops training.
+    #
+    # The tell was in the file: Adam's step counter t read 2,381 at step
+    # 458,000. It counts optimiser steps since the last restart, not since the
+    # run began.
+    #
+    # The pool's w1/w2/w3 moments are slot-indexed and belong to whichever
+    # experts were resident when they were written - not to the ones the
+    # held-out check above has just put on the card. What the restore brings
+    # for them is their step counter; before the first step every expert on
+    # the card is given its own moments from its own file
+    # (PagedPool._own_moments), over whatever the restore wrote in its slot.
+    # `pool.gate` is per-expert and full width, so it restores exactly; a pool
+    # that changed size is caught by the shape guard in _load_optim.
+    try:
+        weights_store._load_optim(opt, model, wdir)
+        t_seen = max((float(st.get("step", 0))
+                      for st in opt.state.values() if "step" in st), default=0)
+        print(f"  optimiser moments restored ({t_seen:,.0f} steps of history)")
+    except Exception as e:                     # never let this stop a run
+        print(f"  [note] optimiser moments not restored: {e}")
+    grower = AutoGrow(grow_k=args.grow_k, max_experts=10_000_000,
+                      mem_frac_max=args.grow_mem_frac,
+                      dying_frac_max=args.grow_dying_frac,
+                      max_in_flight=args.max_in_flight,
+                      keep_ratio_min=args.grow_keep_ratio,
+                      max_disk_gb=args.max_disk_gb,
+                      birth_gate=args.birth_gate,
+                      recent_mult=args.recent_mult) \
+        if args.grow_k else None
     pool.dying_at = args.dying_at
     _PLOTS.update(on=bool(args.plots), since=args.plot_since,
                   log=args.sample_log, weights=args.weights_dir)
@@ -824,11 +817,8 @@ def cmd_read(args):
               f"runs/training_progress.png"
               + (f" and runs/dashboard.png (the last "
                  f"{args.plot_since:g}M)" if args.plot_since else ""))
-    pool.explore = args.explore
-    # A new expert competes without the handicap until it is old enough to be
-    # pruned, so the moment it is judged is the moment its fair turn ends.
-    # One number governs both, which is the point: there is no second window
-    # to reason about.
+    # A newborn is safe from pruning for the survival window - the same
+    # number prune deletes on, so there is one window to reason about.
     pool.trial = survival_steps
     from minagi.tokenizer import ByteTokenizer
     tok = ByteTokenizer()
@@ -988,7 +978,7 @@ def cmd_read(args):
                    "chars": base_chars + seen, "val": val,
                    "experts": pool.n_experts(), "segments": t["segments"],
                    "gate": t["gate"], "use": t["use"], "admits": t["admits"],
-                   "since": t["since"], "born": t["born"],
+                   "born": t["born"],
                    "last_seen": t.get("last_seen"), "uid": t.get("uid"),
                    "trial": getattr(model.pool, "trial", 0)}
             os.makedirs(os.path.dirname(args.history) or ".", exist_ok=True)
@@ -1082,31 +1072,12 @@ def cmd_read(args):
             for j in range(turn):
                 if r.done():
                     break
-                # Ask what THIS text wants, before reading it. The experts
-                # that compute the forward are the ones the backward updates -
-                # swapping between the two would apply one expert's gradient
-                # to whichever expert took its slot.
+                # The experts come from the forward itself: the window's
+                # first pass admits the ones its characters ask for most, and
+                # they stay on the card through the backward and the
+                # optimiser step. `loads_before` only counts them.
                 nxt = r.peek()
-                moved = 0
-                if nxt is not None:
-                    # j == 0 opens this lane's window: a new passage, whose
-                    # first chunk has no previous chunk of its own. The buffer
-                    # at that moment holds the states of the LAST SUBJECT -
-                    # scoring on those chooses a working set for text the
-                    # model has stopped reading. Read the chunk once and score
-                    # on its own states instead; one forward per --passage
-                    # characters, 512 in 32,768.
-                    #
-                    # Every chunk after that keeps the cheap path: its
-                    # predecessor is the same passage, and locally coherent
-                    # text is what demand() was built to score.
-                    moved = (model.peek_experts(nxt, free=True) if j == 0
-                             else model.want_experts(nxt))
-                    swapped += moved
-                    if tracer is not None and not tracer.done():
-                        # j == 0 is the chunk that opens this lane's window -
-                        # the only point where the subject actually changes
-                        tracer.add_swap(lane, moved, j == 0)
+                loads_before = pool.loads
                 # One rate, scaled by the plasticity controller. It moves
                 # only when held-out says something has changed - down on a
                 # plateau, back up when the ground moves - so there is no
@@ -1123,6 +1094,7 @@ def cmd_read(args):
                     from minagi.pool import capture_routes
                     with capture_routes() as got:
                         loss = r.step(learn=True, aux_weight=cfg.pool_aux)
+                    moved = pool.loads - loads_before
                     if loss is not None and got:
                         tracer.add(got, pool, lane, moved, step, float(loss),
                                    seen, nxt)
@@ -1143,6 +1115,12 @@ def cmd_read(args):
                     # a signal is watched before it is trusted with anything.
                     snr.observe(trunk)
                 opt.step()
+                moved = pool.loads - loads_before      # admitted by the forward
+                swapped += moved
+                if tracer is not None and not tracer.done():
+                    # j == 0 is the chunk that opens this lane's window -
+                    # the only point where the subject actually changes
+                    tracer.add_swap(lane, moved, j == 0)
                 # nothing to detach: the reader re-forwards its whole window
                 # every step so the gradient can reach all of it, and keeps no
                 # cache between steps. Detaching is what used to cut the
@@ -1158,7 +1136,12 @@ def cmd_read(args):
                 did += 1
                 if args.sample_every and (
                         time.time() - last_sample >= args.sample_every * 60):
-                    last_sample = time.time()
+                    # READING SPEED closes here, before the held-out check and
+                    # the samples: characters trained over the time spent
+                    # reading since the last round ended. Neither the check
+                    # nor the writing can leak into it.
+                    read_rate = (seen - mark_c) / max(time.time() - mark_t,
+                                                      1e-6)
                     v_ = se_ = None
                     dom = None
                     if ev is not None:
@@ -1175,20 +1158,26 @@ def cmd_read(args):
                         moved_lr = plast.observe(v_, se_)
                         if moved_lr:
                             print(f"    {moved_lr}", flush=True)
+                    # WRITING SPEED: the characters the samples wrote over the
+                    # time spent writing them. Every reading writes exactly
+                    # sample_chars.
+                    variants = _sample_variants(args)
+                    t_w = time.time()
                     s = sample_now(model, tok, device, args.sample_chars,
-                                   variants=_sample_variants(args))
-                    dt = max(time.time() - mark_t, 1e-6)
-                    rate = (seen - mark_c) / dt
-                    mark_t, mark_c = time.time(), seen
+                                   variants=variants)
+                    write_rate = (len(SAMPLE_PROMPTS) * len(variants)
+                                  * args.sample_chars
+                                  / max(time.time() - t_w, 1e-6))
                     tr = float(np.mean(recent)) if recent else None
                     write_samples(args.sample_log, step, base_chars + seen,
                                   (time.time() - t0) / 60, s, v_, se_, dom,
                                   pool.n_experts(), tr,
                                   opt.param_groups[-1]["lr"],
                                   info["characters"], ctx_now, ctx_max,
-                                  context_gain(), rate,
+                                  context_gain(), read_rate,
                                   float(np.mean(grads)) if grads else None,
-                                  args.clip, plast.state())
+                                  args.clip, plast.state(),
+                                  write_rate=write_rate)
                     rp = pool.report()
                     print(f"    samples -> {args.sample_log}"
                           + (f"  train {float(np.mean(recent)):.4f}"
@@ -1199,7 +1188,9 @@ def cmd_read(args):
                           + f"  | {swapped/max(did,1):.1f} experts loaded "
                             f"onto the card per chunk, RAM hit rate "
                             f"{rp['hit_rate']:.2f}"
-                          + f"  | context {ctx_now:,}  {rate:,.0f} char/s"
+                          + f"  | context {ctx_now:,}  reading "
+                            f"{read_rate:,.0f} char/s, writing "
+                            f"{write_rate:,.1f} char/s"
                           + _dropped_note(model)
                           + f"  ({(time.time()-t0)/60:.0f} min)", flush=True)
                     if args.save:
@@ -1213,6 +1204,14 @@ def cmd_read(args):
                         # history costs nothing; writing the model costs
                         # minutes and would dominate a short run.
                         log_history(v_)
+                    # THE SAMPLE CLOCK starts when the round ends, so the next
+                    # round is due after `sample_every` minutes of reading
+                    # however long this one took. Started at the round's
+                    # beginning, a round longer than the interval made the
+                    # next one due at once, and the run read one step between
+                    # rounds.
+                    last_sample = mark_t = time.time()
+                    mark_c = seen
                 # Gathering the evidence and acting on it are separate
                 # things. Tied together, the window grew one character per
                 # evidence batch - measured, 29 characters in 6 million read,
@@ -1325,8 +1324,10 @@ def cmd_read(args):
             if stop or seen >= target:
                 break
     el = time.time() - t0
+    read_rate = (seen - mark_c) / max(time.time() - mark_t, 1e-6)
     print(f"\nread {seen/1e6:.2f}M characters in {el/60:.1f}m "
-          f"({seen/max(el,1e-9)/1e3:.1f}k char/s)")
+          f"({seen/max(el,1e-9)/1e3:.1f}k char/s over the whole session, "
+          f"checks and samples included)")
     if losses:
         print(f"  mean loss over the files: {np.mean(losses):.4f}")
 
@@ -1340,8 +1341,12 @@ def cmd_read(args):
                   f"what forgetting looks like, measured rather than assumed")
 
     if args.sample_every:
+        variants = _sample_variants(args)
+        t_w = time.time()
         s = sample_now(model, tok, device, args.sample_chars,
-                                   variants=_sample_variants(args))
+                       variants=variants)
+        write_rate = (len(SAMPLE_PROMPTS) * len(variants) * args.sample_chars
+                      / max(time.time() - t_w, 1e-6))
         write_samples(args.sample_log, step, base_chars + seen,
                       (time.time() - t0) / 60, s,
                       after if ev is not None else None,
@@ -1350,9 +1355,9 @@ def cmd_read(args):
                       pool.n_experts(),
                       float(np.mean(recent)) if recent else None,
                       opt.param_groups[-1]["lr"], info["characters"],
-                      ctx_now, ctx_max, context_gain(),
-                      seen / max(time.time() - t0, 1e-6),
-                      float(np.mean(grads)) if grads else None, args.clip)
+                      ctx_now, ctx_max, context_gain(), read_rate,
+                      float(np.mean(grads)) if grads else None, args.clip,
+                      write_rate=write_rate)
         print(f"  final samples in {args.sample_log}")
 
     if args.save:
@@ -1524,8 +1529,9 @@ def sample_now(model, tok, device, n_new=140, variants=None):
     the model being right. The repeat rate on the RAW reading is the number to
     drive down, and only a better model can drive it.
 
-    Each variant re-chooses its experts from the prompt, so the second is not
-    reading with the working set the first left behind.
+    Each variant starts at position 0, so the second reads the prompt exactly
+    as the first did, and each character of either reply admits the experts
+    it asks for.
     """
     from minagi.decode import pick_next
     if variants is None:
@@ -1534,14 +1540,6 @@ def sample_now(model, tok, device, n_new=140, variants=None):
                                      adapt_decay=0.88))]
     was_training = model.training
     model.eval()
-    # Sampling must not change what the next training chunk reads with. The
-    # pool's observation buffer is consumed by the next want_experts, and a
-    # round of sampling left it holding the tail of the last prompt's
-    # generation - so one training chunk every ten minutes chose its working
-    # set from sample text. Put back whatever was there.
-    _pool = getattr(model, "pool", None)
-    _held = getattr(_pool, "_h_keep", None)
-    _held = list(_held) if _held is not None else None
     out = []
     for name, prompt in SAMPLE_PROMPTS:
         texts = []
@@ -1549,23 +1547,9 @@ def sample_now(model, tok, device, n_new=140, variants=None):
             ids = list(tok.encode(prompt).ids)[-model.cfg.block:]
             cur = torch.tensor([ids], device=device)
             caches = model.empty_caches()
-            # Choose the experts for THIS prompt, by reading it first.
-            #
-            # want_experts alone scored the buffer of states left by the
-            # PREVIOUS prompt's generation, and ignored this one entirely -
-            # so every prompt in a round was answered with a working set
-            # chosen from the text before it, and the first with one chosen
-            # from the last training chunk. peek_experts reads the prompt
-            # once and scores on its own states.
-            #
-            # `free` releases the hysteresis that keeps the working set steady
-            # while reading a continuous stream. A prompt is the opposite - a
-            # deliberate change of subject - and the model should be free to
-            # re-choose at once.
-            if hasattr(model, "peek_experts"):
-                model.peek_experts(cur, free=True)
-            else:
-                model.begin_segment()
+            # The prompt's forward, at position 0, admits the experts its
+            # characters ask for; then every character of the reply is a
+            # forward of its own and admits the experts it asks for.
             off = 0
             got = []
             # NO GRAPH. model.eval() only changes dropout; without this every
@@ -1575,21 +1559,6 @@ def sample_now(model, tok, device, n_new=140, variants=None):
             # and two readings per prompt it is what put sampling out of
             # memory while training itself sat at 3.8 GB.
             for i in torch.arange(n_new).tolist():
-                # Ask again as the answer develops: what the text wants after
-                # a hundred characters of chess is not what the prompt alone
-                # asked for.
-                #
-                # It has to be asked of the TEXT. `cur` is one token from the
-                # second step onward - `cur = nxt` at the bottom of this loop
-                # - so this used to re-pick the whole working set from a single
-                # character's embedding, every 64 characters. That is not
-                # adaptation but a re-roll on whichever character landed on the
-                # boundary, and it can evict experts the prompt chose
-                # correctly. `ids + got` is the text so far and is already
-                # being built for the decoder below.
-                if i and i % 64 == 0 and hasattr(model, "want_experts"):
-                    recent = (ids + got)[-model.cfg.block:]
-                    model.want_experts(torch.tensor([recent], device=device))
                 with torch.no_grad():
                     logits, _ = model(cur, caches=caches, pos_offset=off)
                 off += cur.shape[1]
@@ -1602,8 +1571,6 @@ def sample_now(model, tok, device, n_new=140, variants=None):
             texts.append((label, tok.decode(got)))
             del caches
         out.append((name, prompt, texts))
-    if _pool is not None:
-        _pool._h_keep = _held
     if was_training:
         model.train()
     return out
@@ -1691,7 +1658,8 @@ def refresh_plots():
 def write_samples(path, step, chars, minutes, samples, val=None, se=None,
                   per_domain=None, experts=None, train=None, lr=None,
                   corpus=None, context=None, ceiling=None, gain=None,
-                  rate=None, gnorm=None, clip=None, plast=None):
+                  rate=None, gnorm=None, clip=None, plast=None,
+                  write_rate=None):
     with open(path, "a") as f:
         f.write(f"\n{'=' * 78}\n")
         # How much has been read, against how much there is. A bare count of
@@ -1714,9 +1682,14 @@ def write_samples(path, step, chars, minutes, samples, val=None, se=None,
             if ceiling:
                 f.write(f" of {ceiling:,}")
             if rate:
-                # Measured over the interval since the last entry, not over
-                # the whole run, so it describes the window in force now
+                # Measured over the time spent reading since the last entry -
+                # not the held-out check, not the samples - so it describes
+                # the training itself, at the window in force now
                 f.write(f"   reading {rate:,.0f} char/s")
+            if write_rate:
+                # the samples below: characters written over the time spent
+                # writing them
+                f.write(f"   writing {write_rate:,.1f} char/s")
             if gain is not None:
                 f.write(f"   still gaining {gain:+.4f} deep into it")
             f.write("\n")
@@ -1819,7 +1792,7 @@ def _split_trunk_pool(model):
     ids = {id(p.gate)}
     if hasattr(p, "experts") and p.experts is not None:
         ids |= {id(q) for e in p.experts for q in e.parameters()}
-    for nm in ("w1", "w3", "w2", "segment_router"):
+    for nm in ("w1", "w3", "w2"):
         obj = getattr(p, nm, None)
         if obj is None:
             continue
@@ -1840,10 +1813,10 @@ def build_paged(wdir, device, resident=None, ram_capacity=256, ceiling=None,
     Load the model with its pool on disk rather than in VRAM.
 
     The three tiers the project describes: every expert is a file, RAM keeps
-    the recently wanted ones, and only the working set is on the card. What
-    makes it possible is that the working set is chosen once per segment
-    rather than per token - per-token routing wanted nearly the whole pool
-    within microseconds and nothing could be left out.
+    the recently wanted ones, and the card holds the experts the current
+    forward admitted. While a forward has room on the card, every character ranks the
+    whole pool; a forward may use at most `resident` experts, the ones its
+    characters ask for most - see PagedPool.admit.
 
     read_only makes the pool incapable of writing to `wdir`. Pass it from any
     tool that inspects a directory a training run may own - paging an expert in
@@ -1863,18 +1836,11 @@ def build_paged(wdir, device, resident=None, ram_capacity=256, ceiling=None,
     # written before this existed carries no value for it and would otherwise
     # get the dataclass default, which is right but silent; taking it from the
     # config every load means the number in the file is the number in effect.
-    _key_floor = _audition = None
     try:
         from minagi.config import load as _load_cfg, get as _get_cfg
         _c = _load_cfg()
         cfg.pool_capacity_factor = float(
             _get_cfg(_c, "pool.capacity_factor", cfg.pool_capacity_factor))
-        # Same reasoning as the capacity factor: how the pool is SCHEDULED is
-        # a property of the run, not of the checkpoint. Applied here rather
-        # than in cmd_read so that everything opening a paged model - serving,
-        # the probes - schedules it the way the run does.
-        _key_floor = _get_cfg(_c, "pool.key_floor", None)
-        _audition = _get_cfg(_c, "pool.audition_slots", None)
     except Exception:
         pass
     # the per-token router keeps one row per EXPERT, not per VRAM slot, so it
@@ -1907,34 +1873,22 @@ def build_paged(wdir, device, resident=None, ram_capacity=256, ceiling=None,
             m._pool[0] = pool
     model.pool = pool
     pool.attach_sites(model)
-    if _key_floor is not None:
-        pool.key_floor = float(_key_floor)
-    if _audition is not None:
-        pool.audition_slots = int(_audition)
     pool.load_telemetry(man.get("telemetry"))
+    # Exploration while training - see PagedPool.begin_forward. Read from
+    # config.yaml at every load, like the capacity bound: it is a choice about
+    # how the model trains, not a property of its weights.
+    try:
+        from minagi.config import load as _load_cfg, get as _get_cfg
+        _c = _load_cfg()
+        pool.explore_bias = float(_get_cfg(_c, "pool.explore_bias", 0.0))
+        pool.explore_steps = float(_get_cfg(_c, "pool.explore_steps", 1000))
+    except Exception:
+        pass
     ever = cfgd.get("pool_ever")
     if ever:
         n = min(len(ever), pool.ever.numel())
         pool.ever[:n] = torch.tensor(ever[:n], dtype=torch.bool,
                                      device=pool.ever.device)
-    since = cfgd.get("pool_since")
-    if since:
-        n = min(len(since), pool.since.numel())
-        pool.since[:n] = torch.tensor(since[:n], dtype=pool.since.dtype,
-                                      device=pool.since.device)
-    # WHAT EACH EXPERT RESPONDS TO. `keys` is a non-persistent buffer, so a
-    # resumed run started with all of them zero, and `want` then skipped the
-    # key term entirely - see PagedPool.route. That term is half the routing
-    # mass (key_weight 1.0 against a router normalised to the same total), and
-    # it is the half that can speak for an expert which is NOT resident. The
-    # router alone speaks only for the ~32 on the card, so the other ~190 were
-    # ranked by their gate and nothing else: content-blind, the same experts
-    # chosen for every input. That is the held-out jump at every restart, and
-    # the experts left unchosen went flat, went silent, and were pruned in
-    # bulk once they were old enough. A key is a function of w1, so rebuilding
-    # is exact - nothing needs to be stored.
-    if hasattr(pool, "build_keys"):
-        pool.build_keys(verbose=not read_only)
     # the trunk still comes from the bundles; the experts come from their files
     core = np.load(os.path.join(wdir, "core.npz"))
     rout = np.load(os.path.join(wdir, "routers.npz"))
@@ -1942,8 +1896,12 @@ def build_paged(wdir, device, resident=None, ram_capacity=256, ceiling=None,
     # Router rows belong to EXPERTS, not to VRAM slots, so they are loaded
     # whole. Slicing them to the resident count - which this did, left over
     # from when rows were slots - silently discarded every expert past the
-    # working set and made any resume after growth fail to load.
+    # card and made any resume after growth fail to load.
     for k in rout.files:
+        # The segment router chose working sets before selection moved into
+        # the router itself; directories written then still carry its rows.
+        if k.startswith("pool.segment_router."):
+            continue
         sd[k] = torch.from_numpy(rout[k])
     missing, unexpected = model.load_state_dict(sd, strict=False)
     bad = [k for k in unexpected if "router" in k or "gate" in k]
@@ -2122,22 +2080,6 @@ def main():
                     help="append one line per checkpoint recording every "
                          "expert's gate, usage and admissions, so a long run "
                          "can be analysed afterwards; empty to disable")
-    rd.add_argument("--margin", type=float,
-                    default=_cfg(_c, "pool.margin", 0.10),
-                    help="how much more a candidate must be wanted before it "
-                         "displaces a resident expert")
-    # `--dwell` is a strict prefix of `--dwell-chars`, and argparse matches
-    # unambiguous prefixes - so the old spelling would be accepted silently and
-    # read as characters. An alias that keeps the name and changes the unit is
-    # the exact failure this whole change exists to remove, so it is rejected
-    # explicitly rather than left to be discovered.
-    rd.add_argument("--dwell", dest="dwell_retired", type=int, default=None,
-                    help=argparse.SUPPRESS)
-    rd.add_argument("--dwell-chars", dest="dwell", type=int,
-                    default=_cfg(_c, "pool.dwell_chars",
-                                 _cfg(_c, "pool.dwell", 4) * 512),
-                    help="CHARACTERS a newly admitted expert is safe from being "
-                         "displaced again")
     rd.add_argument("--ram-capacity", type=int,
                     default=_cfg(_c, "pool.ram_cache", 128),
                     help="experts kept in system memory; when full the one "
@@ -2225,6 +2167,11 @@ def main():
                     default=_cfg(_c, "model.halt_thresh", None),
                     help="at inference, stop at the first row whose cumulative "
                          "halting mass passes this")
+    rd.add_argument("--halt-freeze", action=argparse.BooleanOptionalAction,
+                    default=bool(_cfg(_c, "model.halt_freeze", False)),
+                    help="a character that has halted stops being computed, "
+                         "in training and inference alike: later characters "
+                         "read its final state at the deeper rows")
     rd.add_argument("--min-steps", type=int,
                     default=_cfg(_c, "model.min_steps", 1),
                     help="rows a character must run before halting may stop "
@@ -2258,14 +2205,6 @@ def main():
                          "brake's idle line so additions have to earn their way")
     rd.add_argument("--grow-keep-ratio", type=float,
                     default=_cfg(_c, "growth.keep_ratio_min", 0.35))
-    rd.add_argument("--segment-chars", dest="segment_chunks", type=int,
-                    default=_cfg(_c, "pool.segment_chars",
-                                 _cfg(_c, "pool.segment_chunks", 16) * 512),
-                    help="CHARACTERS one working set covers")
-    rd.add_argument("--explore", type=float,
-                    default=_cfg(_c, "pool.explore", 0.15),
-                    help="share of the working set reserved for experts that "
-                         "have gone longest without being resident")
     rd.add_argument("--trunk-lr-mult", type=float,
                     default=_cfg(_c, "training.trunk_lr_mult", 0.3),
                     help="the trunk is shared by every domain and is where "

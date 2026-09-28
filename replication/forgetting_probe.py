@@ -144,10 +144,12 @@ def main():
     ap.add_argument("--wd", type=float, default=0.1)
     ap.add_argument("--out", default="runs/cl/probe.json")
     ap.add_argument("--no-swap", action="store_true",
-                    help="WORST CASE. Freeze the working set: choose it once "
-                         "and never again, so the same experts serve every "
-                         "subject. This removes the one thing that makes the "
-                         "pool a pool - that different text pulls in "
+                    help="WORST CASE. Freeze the experts: the first window "
+                         "admits its set, and that set serves every later "
+                         "forward, held-out included, so the same experts "
+                         "serve every subject. This removes the one thing "
+                         "that makes the pool a pool - that different text "
+                         "pulls in "
                          "different experts - and leaves a fixed network of "
                          "the same size, trained on the same stream. It is "
                          "the closest thing here to an ordinary transformer "
@@ -181,6 +183,10 @@ def main():
           "lr": a.lr * a.trunk_lr_mult}
     pg = {"params": pool_ps, "name": "pool", "weight_decay": a.wd, "lr": a.lr}
     opt = torch.optim.AdamW([tg, pg], lr=a.lr, betas=(0.9, 0.95))
+    # The pool steps every expert on the card with that expert's own moments,
+    # which it can only do if it knows the optimiser. Unattached, an expert
+    # paged in was stepped with whatever its slot held for the one before.
+    pool.attach_optimiser(opt)
     if not a.cold_optim:
         from minagi.store import _load_optim
         try:
@@ -194,7 +200,7 @@ def main():
     else:
         print("  COLD optimiser - moments discarded")
     print(f"  trunk at {a.trunk_lr_mult:g}x the pool rate"
-          + ("   WORKING SET FROZEN (no swapping)" if a.no_swap else ""))
+          + ("   EXPERTS FROZEN after the first window" if a.no_swap else ""))
 
     lanes = [x.strip() for x in a.rotate.split(",") if x.strip()] or [a.domain]
     per_lane = (a.steps // max(1, len(lanes))) + a.visit * 3 + 8
@@ -232,12 +238,12 @@ def main():
     # travelled from its starting point turns "the forgetting lives in the
     # trunk" from a claim into a measurement.
     trunk0 = {id(p_): p_.detach().float().clone() for p_ in trunk}
-    # NOT the expert slabs. `pool.experts.*` is slot-indexed and swap_to
+    # NOT the expert slabs. `pool.experts.*` is slot-indexed and admission
     # overwrites a slot the moment a different expert pages into it, so the
     # tensor at the end of a run belongs to a different expert than the one
     # snapshotted at the start - the difference would measure paging, not
     # learning. Only the per-expert bookkeeping that stays put is comparable:
-    # the gate, the keys, the router rows.
+    # the gate and the router rows.
     _slab = lambda n: ".experts." in n
     _name = {id(q): n for n, q in model.named_parameters()}
     pool0 = {id(p_): p_.detach().float().clone() for p_ in pool_ps
@@ -267,12 +273,6 @@ def main():
                 _readers.pop(reader.name, None)
                 reader = fresh(lane_i[0])
             nxt = reader.peek()
-            if nxt is not None and not (a.no_swap and done):
-                # with --no-swap the set is chosen ONCE, on the first chunk,
-                # and then held for the rest of the run
-                model.want_experts(nxt)
-            slots = [int(s) for s in getattr(pool, "slots", []) if s >= 0]
-            touched.update(slots)
             if a.warmup:
                 w = min(1.0, (done + 1) / float(a.warmup))
                 for g in opt.param_groups:
@@ -286,6 +286,15 @@ def main():
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), a.clip)
             opt.step()
+            # the window's forward admitted its experts; count them now
+            touched.update(int(s) for s in getattr(pool, "slots", []) if s >= 0)
+            if a.no_swap and done == 0 and hasattr(pool, "begin_text"):
+                # FROZEN from here on: no forward starts afresh and nothing
+                # more is admitted, so every later forward routes among the
+                # experts this first window admitted
+                pool.begin_text = lambda *a, **k: None
+                pool.begin_forward = lambda *a, **k: None
+                pool.admitting = lambda: False
             done += 1
         d = ev.run(a.eval_chunks)
         d.pop("stderr", None)
@@ -328,8 +337,6 @@ def main():
                                                  a.chunk, ctx, device)
                     rreader = _rr[rl[ri]]
                 nxt = rreader.peek()
-                if nxt is not None:
-                    model.want_experts(nxt)
                 opt.zero_grad(set_to_none=True)
                 loss = rreader.step(learn=True, aux_weight=cfg.pool_aux)
                 if loss is None:
