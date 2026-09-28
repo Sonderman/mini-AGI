@@ -7,13 +7,21 @@ tiers, and only the last is scarce.
 
 WHICH EXPERTS ARE ON THE CARD is decided by one rule, and it is the router's:
 
-    Every forward admits its own experts. While it has room on the card,
-    every character, at every pass, ranks the WHOLE pool with the router and
-    asks for its top_k. A forward may use at most `resident` different
-    experts: they are admitted in order of how much router probability its
-    characters' requests put on them, until the card is full. Every character
-    routes among the admitted experts, so one whose request was not admitted
-    takes its best admitted expert instead.
+    The text chooses. Every character ranks the WHOLE pool with the router
+    and asks for its top_k, each request carrying the probability the router
+    gave it, and every forward's first pass adds its characters' requests to
+    the vote of its text - everything read since position 0. A forward may
+    use at most `resident` different experts: it is admitted the ones its
+    text has voted for most, until the card is full. Every character routes
+    among the admitted experts, so one whose request was not admitted takes
+    its best admitted expert instead.
+
+A training window is a text of its own, so its experts are the most
+requested of its first pass. A reply is a text that grows one character at a
+time: each character is a forward of its own, and routes among the experts
+the prompt and the reply so far have voted for - the same choice a window
+over that text would make, cut off at the character being written. A single
+character never chooses for itself; training never asks it to.
 
 While training, the choice also EXPLORES: an expert used less than its fair
 share of recent training forwards gets a bonus on its router score wherever
@@ -24,7 +32,8 @@ only what the router would have admitted without it - see begin_forward.
 A forward is whatever the model computes at once - a training window, a chunk
 of held-out file, a prompt, and then each character of the reply. What is
 computed depends only on the text and the weights; what happened to be on the
-card before only decides how many experts have to be loaded.
+card before only decides how many experts have to be loaded - and because a
+text's vote moves slowly, a reply loads a new expert only now and then.
 
 The cap is not arbitrary. Everything a forward used must still be on the card
 for its backward and for the optimiser step, and an expert on the card for
@@ -61,6 +70,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .precision import is_moment, pack_bf16, unpack_bf16
+
+
+def _tally(total, add):
+    """A text's vote plus one more forward's requests. The pool may have grown
+    since the vote began; growth appends experts, so their counts start at
+    zero at the end."""
+    if total is None:
+        return add.clone()
+    if total.numel() < add.numel():
+        total = torch.cat([total, total.new_zeros(add.numel() - total.numel())])
+    total[:add.numel()] += add
+    return total
 
 
 class Tiers:
@@ -289,6 +310,14 @@ class PagedPool(nn.Module):
         # what the router alone would have admitted this forward - the only
         # admissions the prune clock counts
         self._merited = set()
+        # THE TEXT'S VOTE. Every forward's first pass adds its requests to it,
+        # and a forward is admitted by the whole of it - so what a character
+        # routes among is chosen by all of its text so far, the way a training
+        # window's experts are chosen by all of the window. A new text starts
+        # it empty. `_merit_vote` is the same without the exploration bonus.
+        self._vote = None
+        self._merit_vote = None
+        self._voted = False
 
     def _f(self, i):
         """Position in the pool's arrays -> the id its file is named by."""
@@ -438,17 +467,18 @@ class PagedPool(nn.Module):
     #
     # A forward may use at most `resident` different experts, because
     # everything it used must still be on the card for its backward and for
-    # the optimiser step. So the experts are admitted as the requests arrive:
-    # at each pass, the requested experts not yet admitted are taken in order
-    # of how much router probability the requests carried, until the card is
-    # full. Nothing admitted is evicted before the forward ends, and the next
-    # forward starts with nothing admitted.
+    # the optimiser step. Its first pass adds its requests to its text's vote
+    # and it is admitted the most-voted experts, until the card is full; a
+    # text so short that fewer have been voted for lets the later passes add
+    # their own requests while there is room. Nothing admitted is evicted
+    # before the forward ends, and the next forward starts with nothing
+    # admitted and is decided by the vote again.
     #
     # For a training window the first pass alone asks for far more than
     # `resident` experts, so the window's set is its first pass's most
-    # requested. A character being written asks for top_k at each pass, so
-    # its forward admits pass by pass, as many as its passes ask for, up to
-    # the card's slots.
+    # requested. A character being written adds its own requests to a vote
+    # its prompt and the reply so far have already cast, so it routes among
+    # what the whole text asks for - which is what training taught it to do.
     #
     # What is computed depends only on the text and the weights: the ranking
     # never looks at what is already on the card. Residency only decides how
@@ -465,6 +495,7 @@ class PagedPool(nn.Module):
         """
         self._admitted = set()
         self._merited = set()
+        self._voted = False
         self._mask = None
         self._bias = None
         self._exploring = bool(explore and self.explore_bias > 0)
@@ -477,7 +508,9 @@ class PagedPool(nn.Module):
             self.recent[:n] *= 1.0 - 1.0 / self.explore_steps
 
     def begin_text(self, explore=False):
-        """A forward from position 0: a new text, which the prune clock counts."""
+        """A forward from position 0: a new text. Its vote starts empty, and
+        the prune clock counts it."""
+        self._vote = self._merit_vote = None
         self.begin_forward(explore)
         self.segments += 1
 
@@ -505,7 +538,15 @@ class PagedPool(nn.Module):
         prune clock counts, so being tried does not keep an expert alive and
         being wanted does. Returns how many experts had to be loaded.
         """
+        m = mass.detach().float().cpu()
         mm = (mass if merit is None else merit).detach().float().cpu()
+        if not self._voted:
+            # this forward's first pass: its requests join the text's vote,
+            # and the forward is admitted by the whole vote
+            self._voted = True
+            self._vote = _tally(self._vote, m)
+            self._merit_vote = _tally(self._merit_vote, mm)
+            m, mm = self._vote, self._merit_vote
         mfree = self.resident - len(self._merited)
         if mfree > 0:
             morder = torch.argsort(mm, descending=True).tolist()
@@ -517,7 +558,6 @@ class PagedPool(nn.Module):
         free = self.resident - len(adm)
         if free <= 0:
             return 0
-        m = mass.detach().float().cpu()
         order = torch.argsort(m, descending=True).tolist()
         new = [e for e in order if float(m[e]) > 0 and e not in adm][:free]
         if not new:
@@ -928,6 +968,9 @@ class PagedPool(nn.Module):
             self._carry(opt, w, fresh.weight, idx=idx)
         remap = {old_i: new_i for new_i, old_i in enumerate(keep)}
         self.slots = [remap.get(s, -1) for s in self.slots]
+        # a vote is counted by position in the pool, which pruning renumbers;
+        # a text in progress starts counting again from its next forward
+        self._vote = self._merit_vote = None
         self._n = len(keep)
         return gone
 

@@ -1548,8 +1548,9 @@ def sample_now(model, tok, device, n_new=140, variants=None):
             cur = torch.tensor([ids], device=device)
             caches = model.empty_caches()
             # The prompt's forward, at position 0, admits the experts its
-            # characters ask for; then every character of the reply is a
-            # forward of its own and admits the experts it asks for.
+            # characters ask for most; then every character of the reply is a
+            # forward of its own, and routes among what the prompt and the
+            # reply so far have voted for.
             off = 0
             got = []
             # NO GRAPH. model.eval() only changes dropout; without this every

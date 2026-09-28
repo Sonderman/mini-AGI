@@ -198,13 +198,15 @@ class RecurCoder(nn.Module):
         cfg = self.cfg
         B, T = idx.shape
         if hasattr(self.pool, "begin_forward"):
-            # EVERY FORWARD ADMITS ITS OWN EXPERTS: nothing admitted yet. What
-            # one forward uses has to be on the card together - through its
-            # backward and the optimiser step when it trains - and nothing
-            # more does, so the next character of a reply, or the next chunk
-            # inside the attention window, chooses again. A forward from
-            # position 0 also begins a new text, which is what the prune clock
-            # counts. See PagedPool.admit.
+            # THE TEXT CHOOSES: nothing admitted yet, and this forward's first
+            # pass will add its requests to its text's vote and be admitted
+            # the most-voted experts. What one forward uses has to be on the
+            # card together - through its backward and the optimiser step when
+            # it trains - so each forward is admitted afresh, but by the whole
+            # text so far: the next character of a reply routes among what the
+            # prompt and the reply have asked for. A forward from position 0
+            # begins a new text, with an empty vote, and is what the prune
+            # clock counts. See PagedPool.admit.
             #
             # A forward that trains also explores: its selection favours the
             # experts used least of late (PagedPool.begin_forward). Measuring
@@ -361,11 +363,12 @@ class RecurCoder(nn.Module):
     def generate(self, idx, max_new_tokens, temperature=0.0, top_k=0,
                  top_p=1.0, collect=False, rep_penalty=1.0,
                  no_repeat_ngram=0, adapt_strength=2.5, adapt_decay=0.88):
-        # The prompt's forward admits the experts its characters ask for, and
-        # then every character of the reply is a forward of its own that
-        # admits the experts it asks for - loading any that are not on the
-        # card. When the attention window fills, the context is re-read from
-        # position 0 - a new text.
+        # The prompt's forward admits the experts its characters ask for most,
+        # and then every character of the reply is a forward of its own that
+        # adds its requests to the vote and routes among what the prompt and
+        # the reply so far have voted for. When the attention window fills,
+        # the context is re-read from position 0 - a new text, whose vote is
+        # the re-read context's.
         self.eval()
         cfg = self.cfg
         caches = self.empty_caches()

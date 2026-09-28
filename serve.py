@@ -60,9 +60,9 @@ def load_prime(chars, root="data/train/self-knowledge"):
 
     TWO THINGS IT BUYS, and they are separate. The reply has context to stand
     on: "hi" alone is two characters, and every character the model writes
-    attends over what came before it and asks for its experts from the state
-    that context gives it. And the learning stream starts part-way to its first
-    step rather than twenty exchanges short of one.
+    attends over what came before it and routes among the experts that whole
+    context has voted for. And the learning stream starts part-way to its
+    first step rather than twenty exchanges short of one.
 
     Taken from the self-knowledge lane because it is already in the register
     the chat is in - <user>/<bot> turns about what the model is - so this is
@@ -135,8 +135,8 @@ def load(weights, device=None, learn=True, lr=3e-4, save_every=8,
     STATE.update(model=model, tok=ByteTokenizer(), weights=weights)
     print(f"[loaded] {weights} on {dev}", file=sys.stderr)
 
-    # A paged model loads with an EMPTY card - every slot -1. Every character
-    # of a reply admits its own experts, so this does not change a reply; what
+    # A paged model loads with an EMPTY card - every slot -1. A reply is
+    # admitted by its own text's vote, so this does not change a reply; what
     # it changes is that the page can show experts on the card before the
     # first question instead of nothing. It is one forward over the priming
     # text, which admits the experts that text asks for, as any forward does.
@@ -266,10 +266,11 @@ def stream(prompt, max_new):
     ids = tok.encode(prompt).ids[-model.cfg.block:]
     out = torch.tensor([ids or [10]], device=device)
 
-    # EVERY FORWARD ADMITS ITS OWN EXPERTS. The prompt is read in chunks, and
-    # each chunk admits the experts its characters ask for; then every
-    # character of the reply is a forward of its own that admits what it asks
-    # for, loading whatever is not already on the card. Nothing here chooses
+    # THE TEXT CHOOSES. The prompt is read in chunks, and each chunk adds its
+    # characters' requests to the text's vote and is admitted the most-voted
+    # experts; then every character of the reply is a forward of its own that
+    # adds its requests and routes among what the whole text has voted for,
+    # loading whatever is not already on the card. Nothing here chooses
     # experts - the forward does.
     pool = getattr(model, "pool", None)
     caches = model.empty_caches()
@@ -598,8 +599,8 @@ function drawMem(){
   $('mem-f').style.width = (100 * Math.min(pending, chunk) / chunk) + '%';
 }
 function drawExp(){
-  // A character may use at most as many experts as the card has slots; each
-  // one admits the experts it asks for.
+  // A character may use at most as many experts as the card has slots: the
+  // ones its text - the prompt and the reply so far - has voted for most.
   const {admitted, slots} = MECH;
   if (!slots){ $('exp-n').textContent = '-'; return; }
   $('exp-n').textContent = admitted + ' of ' + slots;
@@ -739,9 +740,9 @@ document.getElementById('f').onsubmit = async (e) => {
         else if (d.swap){
           applyState(d);
           if (d.swap.moved){
-            // every character admits its own experts, so loads come often;
-            // the note keeps the reply's running total rather than flashing
-            // one message per character
+            // a load comes when the text's vote shifts, now and then; the
+            // note keeps the reply's running total rather than flashing one
+            // message per load
             MECH.loaded += d.swap.moved;
             flare($('m-exp'));
             note(MECH.loaded + (MECH.loaded === 1 ? ' expert loaded'

@@ -59,14 +59,15 @@ pool:
   depth: 1                # SwiGLU blocks stacked inside one expert
   top_k: 8                # how many one character routes through
 
-  # HOW EXPERTS ARE CHOSEN - one rule. Every forward admits its own experts.
-  # While it has room on the card, every character, at every pass, ranks the
-  # whole pool with the router and asks for its top_k. A forward - a training
-  # window, a chunk of held-out file, a prompt, each character of a reply -
-  # may use at most `resident` different experts: they are admitted in order
-  # of how much router probability its characters' requests put on them,
-  # until the card is full, and a character whose request was not admitted
-  # takes its best admitted expert instead.
+  # HOW EXPERTS ARE CHOSEN - one rule: the text chooses. Every character
+  # ranks the whole pool with the router and asks for its top_k, and every
+  # forward's first pass adds its characters' requests to the vote of its
+  # text - everything read since position 0. A forward - a training window, a
+  # chunk of held-out file, a prompt, each character of a reply - may use at
+  # most `resident` different experts: the ones its text has voted for most,
+  # and a character whose request was not admitted takes its best admitted
+  # expert instead. A character being written routes among what its prompt
+  # and the reply so far asked for, as it would inside a training window.
   #
   # Three tiers: disk holds every expert, RAM caches the recently wanted,
   # VRAM holds what the current forward admitted. Only VRAM is scarce.
@@ -85,7 +86,7 @@ pool:
   # to nothing when busy. It never changes how much a chosen expert
   # contributes, and the prune clock counts only what the router would have
   # admitted without it: being tried keeps nothing alive, being wanted does.
-  explore_bias: 0.15      # logits; 0 turns exploration off 
+  explore_bias: 0.5       # logits; 0 turns exploration off 
                           # (the higher the number is the more reads from the disk 
                           # are expected, so the reading/writing speed would be less)
   explore_steps: 1000     # training steps "recent use" is averaged over

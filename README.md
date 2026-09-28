@@ -20,118 +20,127 @@ The weights are **not published yet**. The run is still reading its first pass o
 
 ![training progress](assets/training_progress.png)
 
-*Every sample round of the run to date: 635.8M characters over 1,335 evaluations.*
+*Every sample round of the run to date: 688.5M characters over 1,377 evaluations.*
 
 </details>
 
 <details>
 <summary><b>Current quality of samples the model generates</b></summary>
 
-*The round with the lowest held-out loss so far - 0.6950 nats at 634.5M characters. Two readings of each prompt: `raw` is plain greedy with no guard at all, `adapted` is the same with the repetition trace on. The whole history is in [runs/samples.txt](runs/samples.txt).*
+*The round with the lowest held-out loss so far - 0.6870 nats at 680.5M characters. Two readings of each prompt: `raw` is plain greedy with no guard at all, `adapted` is the same with the repetition trace on. The whole history is in [runs/samples.txt](runs/samples.txt).*
 
 ```
 ==============================================================================
-step 310,191   634.5M of 7,880M characters (8.05%)   56 min   182 experts
-context 4,096 characters of 4,096   reading 2,013 char/s   writing 5.2 char/s   still gaining +0.0399 deep into it
-grad norm 1.04 against a clip of 1   clipping
-train loss 0.5598   lr 6.13e-05   evidence t +1.43 over 65.7 (effect +0.0317)   rate x0.204
-held-out loss 0.6950 +/-0.0310 nats   1.0027 bits/char   perplexity 2.00   gap +0.1352
-  arithmetic 0.624   chat 0.670   chat_hermes 1.002   chess 0.453   code 0.584   reasoning 0.614   stories 0.479   wikipedia 1.134
-repeats 25% of 8-grams, greedy with no guard
+step 332,657   680.5M of 7,880M characters (8.64%)   26 min   205 experts
+context 4,096 characters of 4,096   reading 1,940 char/s   writing 19.3 char/s   still gaining +0.0095 deep into it
+grad norm 1.11 against a clip of 1   clipping
+train loss 0.5833   lr 5.75e-05   evidence t +2.16 over 65.7 (effect +0.0481)   rate x0.192
+held-out loss 0.6870 +/-0.0310 nats   0.9911 bits/char   perplexity 1.99   gap +0.1037
+  arithmetic 0.623   chat 0.663   chat_hermes 0.990   chess 0.444   code 0.574   reasoning 0.602   stories 0.470   wikipedia 1.130
+repeats 26% of 8-grams, greedy with no guard
 ==============================================================================
 
 --- stories ---
 prompt: 'Once upon a time, there was a little boy named Tom. One day he '
-[raw]  repeated 8-grams 68%
-went to the paaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa the boy aaved it a special 
-[adapted]  repeated 8-grams 8%
-was playing outside when he met another boy. They were playing outside and havinman. Tom was very hungry.
+[raw]  repeated 8-grams 3%
+went to the park with his mom. He saw a big slide and wanted to play with it. Tom was very happy and said, "Mom, can I play with my slide?" 
+[adapted]  repeated 8-grams 7%
+was playing with his ball. He was very hungry.
 
-"Hi, I'all!" smiled the boy.
+Tom saw a big, shiny ball. He wanted to play with it. He ran towards it.
 
-"Hi
+Tom saw his friend
 
 --- code ---
 prompt: 'def merge_sorted(a, b):\n    '
-[raw]  repeated 8-grams 43%
+[raw]  repeated 8-grams 72%
 """
-    The merged armid of the arange of the arange of the arange of the arange of the analogian.
+    Returns the sorted sorted sorted sorted sorted sorted sorted sorted sorted
+    sorted sorted sorted sorted sorted sorted sorted sort
+[adapted]  repeated 8-grams 32%
+"""Returns an integer consisting of all the sorted arguments.
 
-    The analogian of the analoanant and 
-[adapted]  repeated 8-grams 9%
-"""Merges more than b, without any sorted."""
-    a, b, width, width = b
-
-    Then, allocates more and b, without any something.
+    There's another integer consisting of all the sorted arguments.
     """
-   
+ 
 
 --- arithmetic ---
 prompt: 'add 4917 + 388 = '
-[raw]  repeated 8-grams 38%
+[raw]  repeated 8-grams 30%
 <think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 4+0+1=5c0 </think> 5305
-add 77 + 7 = 84
-add 77 + 7 = 84
-add 7 + 7 = 14
-add 7 + 7 = 14
-add 7 + 7 = 14
-add 7 + 7 = 14
-[adapted]  repeated 8-grams 1%
+add 8 + 8 = 16
+sub 8 - 8 = 0
+sub 8 - 8 = 0
+sub 8 - 8 = 0
+add 8 + 8 = 16
+add 8 + 8 = 16
+add 
+[adapted]  repeated 8-grams 0%
 <think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 4+0+1=5c0 </think> 5305
-add 7296841 + 370259 = <think> 1+9+0=0c1 4+5+1=0c1 8+2+1=1c1 6+0+1=7c0 9+7+0=6c1 2+3+1=6c0 7+0+0=
+add 862794 + 130856 = 993650
+sub 274183 - 690527 = -416344
+mul 8092 * 57 = 461244
+sub 38095
 
 --- chat ---
 prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
 [raw]  repeated 8-grams 0%
-In a minute, one file per expert, and a twing and one character at a time. Every attention cache are in turn removed that swinal. That is wh
-[adapted]  repeated 8-grams 1%
-In a minute, one file per expert, and a twing mask of 50, which is an expert
+I answer from my weights and from what is in front of me right now.
 </bot>
+
+
 <user>
-What is 510249 + 7?
-</user>
-max(10, 2)
-</user>
-<bot>
-51024 routes that get 
+What does this do?
+def get_context(self):
+    """Return the contex
+[adapted]  repeated 8-grams 2%
+It depends on the character. I decide per character how many passes to take, up to 6, and stop when another pass would not change the answer
 
 --- chat_hermes ---
 prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
-[raw]  repeated 8-grams 28%
-To solve this problem, we need to deteal the speed of the train traveled by the train taken by the taken taken by the taken taken by the tak
-[adapted]  repeated 8-grams 0%
-To solve this problem, we'll first need to find the speed of kalight, which representmental display of km/h.
+[raw]  repeated 8-grams 50%
+To find the speed in km/h, we need to find the speed in km/h and the speed in km/h. The speed in km/h is 60 km/h. The speed in km/h is 60 km
+[adapted]  repeated 8-grams 33%
+To find the speed in km/h, we can use the formula:
 
-Speed = (45/3)*(1/20) = 45/36
-
+speed = (45/2)*(45/2) = 10
+speed = 45/2
+speed = 45/2
+speed = 45/2
+speed = 45/2
+speed = 4
 
 --- reasoning ---
 prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
-[raw]  repeated 8-grams 0%
-Okay, let'a task is to solve thiangularange lists. Let'a start by recallination. The lianguary is a list of lists of nuances and the liana l
-[adapted]  repeated 8-grams 2%
-Okay, let'm start by understmoizing a list. The largements are considerinm whether all nusted minutears cmd(x, y) and minutes(x, y) arms. Th
+[raw]  repeated 8-grams 34%
+Okay, let's try to figure out how to compute the largest number in a list. The largest number is 100. The largest number is 100. The largest
+[adapted]  repeated 8-grams 8%
+Okay, let's try to figure out how to create an Python function that reads from stdin, and provides an example of how to create an instance o
 
 --- wikipedia ---
 prompt: '== History ==\nThe [[Roman Empire]] was '
-[raw]  repeated 8-grams 45%
-formed in [[1999]] forallenes of [[1999]] and [[1999]] foralleneaalleneaalleneaallenes was forallened in [[1999]] foralleneallenealleneallen
-[adapted]  repeated 8-grams 78%
-founded into [[Roman Espie]], [[Roman Espie]], [[Roman Espie]], [[Roman Espie]], [[Roman Espie]], [[Roman Espie]], [[Roman Espie]], [[Roman 
+[raw]  repeated 8-grams 46%
+founded in [[1990]] by [[Roman Empire]] and [[Roman Empire]] in [[1990]]. The [[Roman Empire]] was founded in [[1990]] by [[Roman Empire]] a
+[adapted]  repeated 8-grams 5%
+founded in [[1970]].
+
+== Geography ==
+[[Image:Robert_Map.PNG|right|250px|right|250px|Robert Map]]
+According to the [[United States Census Bu
 
 --- chess ---
 prompt: '<g>1700 1-0 1. e4 e5 2. '
-[raw]  repeated 8-grams 0%   25 legal moves, then Ba
-Nf3 Nc6 3. Bc4 Bc5 4. O-O Nf6 5. d3 O-O 6. Nc3 d6 7. Bg5 Bg4 8. h3 Bh5 9. a3 a6 10. b4 Ba7 11. Bb3 Nd4 12. Nxd4 Bxd4 13. Nd5 Bxb2 14. Rb1 Ba
-[adapted]  repeated 8-grams 0%   19 legal moves, then Nxd4
-Nf3 d6 3. Bc4 h6 4. O-O a6 5. d4 exd4 6. Nxd4 Be7 7. Nc3 Nf6 8. Be3 O-O 9. f4 Nc6 10. Qd2 Ne5 11. Bb3 Nxd4 12. Bxd4 c5 13. Be3 b6 14. Rad1 B
+[raw]  repeated 8-grams 0%   24 legal moves, then 1
+d4 exd4 3. Nf3 Nc6 4. Bc4 Bb4+ 5. c3 dxc3 6. O-O cxb2 7. Bxb2 Nf6 8. e5 Ne4 9. Qe2 Nxe5 100. Nxe5 Qe7 11. Nc3 d6 12. Nd5 Qd7 13. Nxe7 Qxe7 1
+[adapted]  repeated 8-grams 0%   11 legal moves, then Kxf7
+d4 exd4 3. Nf3 c5 4. Bc4 Nc6 5. O-O d6 6. Ng5 Be7 7032. Nxf7 Kxf7 8. Qh5+ Kg8 904. Qxd8+ Bxd8 10326 10. Nc3 Be6 11. Bxe6+ fxe6 12. Nd5 Bg4 1
 
 --- self-knowledge ---
 prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
-[raw]  repeated 8-grams 8%
-Adaa while too many of me, it is me. One file per expert, a file for the trunk, a file for the routers and the saadinated a stranger'and it 
-[adapted]  repeated 8-grams 0%
-Adam with decoupled weight decay. The rate follows no schedule at all, because my bracket of its weights and files are brought onto the cmar
+[raw]  repeated 8-grams 2%
+Adam with decoupled weight decay. The rate follows no schedule at all, because a schedule needs an end to anneal toward and I do not have on
+[adapted]  repeated 8-grams 2%
+Adam with decoupled weight decay. The rate follows no schedule at all, because a schedule needs an end to anneal toward and I do not have on
 ```
 
 </details>
@@ -170,7 +179,7 @@ Three distinct blocks, up to 26 block-applications per character.
 
 Each tile on the left is one expert; colour is expert identity and stays the same for the whole clip. A **row** is one application of the recurrent block, and the eight tiles in it are the eight experts that row actually ran. The stack grows downward as the model keeps going, and the amber line is where halting stopped it - **the grey rows below are computation the model declined to spend.**
 
-The trace on the right is how many rows each character took. It moves constantly between 8 and 16 against a ceiling of 24, and the caret under the text shows which character is being read. The text is a held-out story, read one character at a time after its first 2,048, and every character is a forward of its own: it admits the experts it asks for, and each row picks its eight from the 32 on the card at that moment. The card changes under the stack as it reads - about 19 experts loaded per character over the clip.
+The trace on the right is how many rows each character took. It moves constantly between 9 and 15 against a ceiling of 24, and the caret under the text shows which character is being read. The text is a held-out story, read one character at a time after its first 2,048, and every character is a forward of its own: it adds its requests to the story's vote and routes among the 32 experts the story so far has asked for most, each row picking its eight from those. Over these 160 characters the card does not change once - the 2,048 characters before them have already voted, and the story goes on asking for the same experts.
 
 Positions are rotary and carry no learned parameters, which is why the context window can be extended by continued training rather than by re-initialising anything.
 
@@ -180,13 +189,15 @@ Positions are rotary and carry no learned parameters, which is why the context w
 
 The clip above is the model **reading** - every character is held-out text it is being shown. This one is the model **writing**: it was primed with 2,495 characters of held-out stories and then continued on its own, so the grey text is what it was given and **the green text is entirely its own**. Greedy decoding with the repetition guard - the `adapted` reading in the sample log - and no sampling anywhere: run it twice and you get the same sentence.
 
-Two things are worth watching. The stack behaves the same way, because generating and reading are the same forward pass in this model - the only difference is whether the next character comes from a file or from the model's own argmax - and it costs about the same: 10.7 rows a character over the 140 characters written, against 11.2 over the 160 read from the same stories. And **every character it writes chooses its own experts**. The prompt's forward admitted 32; after that, each character admitted the experts it asked for and loaded the ones not already on the card - 19.6 a character on average, and every character loaded some - so the reply is never held to the experts its prompt chose. None of them was written back: nothing is trained while it writes.
+Two things are worth watching. The stack behaves the same way, because generating and reading are the same forward pass in this model - the only difference is whether the next character comes from a file or from the model's own argmax - and it costs about the same: 11.8 rows a character over the 140 characters written, against 12.1 over the 160 read from the same stories. And **the whole text chooses the experts**, the way it does in training. The prompt's forward admitted the 32 its characters asked for most; after that, every character added its own requests to the vote and routed among what the prompt and the reply so far had asked for. This reply never moved the vote far enough to change the card, so not one expert was loaded after the prompt; a reply that wanders from its prompt takes the card with it. Letting each character choose alone instead, as an earlier version did, made its predictions on the same held-out text a fifth worse, 1.35 nats a character against 1.11, and garbled its words. Nothing was written back: nothing is trained while it writes.
 
 What it produced, continuing the story about a cherry tree that the prompt ends on:
 
-> They would try together, but it was not. One day, the cherry tree was flying around the land. It was very happy, but it was not. The cherry
+> They would stay inside, but only for any more.
+>
+> One day, the cherry tree saw another cherry. It was very big, and it had long, shiny wings.
 
-Grammatical and on the story it was given, but "but it was not" undercuts two of its three sentences, and the tree takes to flying - a fair picture of where the model was at 608.5M characters, when the clip was recorded.
+Spelled right and on the story it was given, but "only for any more" means nothing, and the other cherry has wings - a fair picture of where the model was at 648.6M characters, when the clip was recorded.
 
 ## How paging works
 
@@ -198,9 +209,9 @@ Every expert is a file on disk holding its weights and its Adam moments. Above d
 | RAM | `ram_cache` | the experts used most recently, least-recently-used evicted |
 | VRAM | `resident` | the experts the current forward admitted - what a character may route through |
 
-Selection is one rule, and every forward applies it afresh. While a forward still has room on the card, every character at every pass ranks the **whole pool** with the router - one row per expert, always on the card, so an expert on disk is scored exactly like one in VRAM - and asks for its top 8, each request carrying the probability the router gave it. The **forward** admits experts in order of requested probability until the card's 32 slots are full. Every character then routes with the same router over the admitted experts only and takes its top 8 of those, so a character whose request was not admitted gets its best admitted experts instead.
+Selection is one rule: **the text chooses**. Every character ranks the **whole pool** with the router - one row per expert, always on the card, so an expert on disk is scored exactly like one in VRAM - and asks for its top 8, each request carrying the probability the router gave it. Every forward's first pass adds its characters' requests to the **vote of its text** - everything read since position 0 - and the forward is admitted the experts its text has voted for most, until the card's 32 slots are full. Every character then routes with the same router over the admitted experts only and takes its top 8 of those, so a character whose request was not admitted gets its best admitted experts instead.
 
-The 32 is what VRAM can hold for training: everything a training forward used has to stay on the card through its backward pass and the optimiser step. In training, the first pass of a 4,096-character window already asks for well over a hundred experts, so the window's 32 are fixed at its first pass. A forward with no backward after it - a chunk of held-out text, a character being written - needs its experts only while it runs, so the next forward chooses again. **When the model writes, every character is a forward of its own**: it admits the experts it asks for and loads any that are not on the card, from RAM or from disk, so a reply can follow its topic wherever it goes.
+The 32 is what VRAM can hold for training: everything a training forward used has to stay on the card through its backward pass and the optimiser step. In training a window is a text of its own, and the first pass of its 4,096 characters already asks for well over a hundred experts, so the window's 32 are its first pass's most requested. **When the model writes, every character is a forward of its own** that adds its requests to the vote the prompt and the reply so far have cast, and routes among the 32 that whole text has asked for most - the choice a training window over that text would make, cut off at the character being written. The set follows the text as it goes and moves only when the vote does, so a reply loads a new expert now and then rather than at every character, from RAM or from disk.
 
 Three rules the project holds to:
 
@@ -242,6 +253,8 @@ Training on a single stream, one subject at a time, is the classic recipe for ca
 | swapping, trunk LR = expert LR | -0.3106 | +1.2628 | 0.25 | 74.25% |
 | **swapping, trunk at 0.1x - what the run uses** | **-0.4216** | **+0.1297** | **3.25** | **97.30%** |
 | *interleaved: PG19 added as a 9th lane* | *-0.3124* | *-0.0065* | *nothing forgotten* | *100.13%* |
+
+*These arms were measured before expert selection moved to the rule under [How paging works](#how-paging-works), when the experts on the card were re-chosen before every chunk; the probe now runs the current rule.*
 
 The fourth column is the exchange rate: nats gained on the new domain for every nat lost across the eight. **The mitigated configuration is 13x better at that trade than either unmitigated one** - and interleaved there is no trade at all.
 
@@ -357,25 +370,25 @@ The numbers below are for tracking purposes and move as the run continues. Held-
 There is a second variance underneath these figures. The same configuration run twice lands about 0.014 apart, because the expert dispatch is not deterministic on CUDA. **Treat about 0.03 as the threshold for a real difference**, not the error bar printed beside one score.
 
 <!-- auto:benchmarks -->
-**Where the model is** (635.8M characters read, 183 experts):
+**Where the model is** (688.5M characters read, 209 experts):
 
 | | nats/char | bits/byte |
 |---|---|---|
-| **held-out, all 8 subjects** | **0.6980** ± 0.0315 | **1.0070** |
-| train | 0.5490 | 0.7920 |
+| **held-out, all 8 subjects** | **0.6897** ± 0.0304 | **0.9951** |
+| train | 0.5820 | 0.8396 |
 
 **Held-out loss per subject:**
 
 | Subject | nats/char | bits/byte |
 |---|---|---|
-| `chess` | 0.452 | 0.652 |
-| `stories` | 0.478 | 0.690 |
-| `code` | 0.583 | 0.841 |
-| `reasoning` | 0.620 | 0.894 |
-| `arithmetic` | 0.624 | 0.900 |
-| `chat` | 0.672 | 0.969 |
-| `chat_hermes` | 1.011 | 1.459 |
-| `wikipedia` | 1.143 | 1.649 |
+| `chess` | 0.460 | 0.664 |
+| `stories` | 0.477 | 0.688 |
+| `code` | 0.577 | 0.832 |
+| `reasoning` | 0.603 | 0.870 |
+| `arithmetic` | 0.622 | 0.897 |
+| `chat` | 0.668 | 0.964 |
+| `chat_hermes` | 0.982 | 1.417 |
+| `wikipedia` | 1.128 | 1.627 |
 <!-- /auto:benchmarks -->
 
 ### Data Scaling
@@ -385,18 +398,17 @@ There is a second variance underneath these figures. The same configuration run 
 
 Every point on this chart is a **bits-per-byte on the PG19 test split** - one held-out set, so the comparison is direct. This model scores **2.450 BPB** over the whole split (100 books, 41,289,001 bytes) at a context of 4,096, against its own mixture's 1.16. PG19 is out of distribution for it: it was trained on a corpus assembled for this project and has read no Victorian novels, so much of that gap is subject matter rather than capability.
 
-**The results so far are promising.** The red line is the fitted power law on this model's own held-out, `L ∝ D^-0.242` with R² 0.98 over every point past the warmup - between Kaplan's 0.095 and Chinchilla's 0.28, and it has held for more than a decade of data. How steep it looks depends on where the fit starts, and the band on the chart spans that range rather than pretending to one number.
+**The results so far are promising.** The red line is the fitted power law on this model's own held-out, `L ∝ D^-0.243` with R² 0.98 over every point past the warmup - between Kaplan's 0.095 and Chinchilla's 0.28, and it has held for more than a decade of data. How steep it looks depends on where the fit starts, and the band on the chart spans that range rather than pretending to one number.
 
-Read straight off that trend, on this model's own mixture. It has read 0.64B characters so far, in about 10 days of running. The days below assume the pace of the last 8 hours of it: 768 characters a second on the wall clock, held-out checks and rounds of samples included, because the reading waits for them.
+Read straight off that trend, on this model's own mixture. It has read 0.69B characters so far, in about 10 days of running. The days below assume the pace of the last 7 hours of it: 1,603 characters a second on the wall clock, held-out checks and rounds of samples included, because the reading waits for them.
 
-| held-out | total data read | further reading | days from here at ~768 char/s |
+| held-out | total data read | further reading | days from here at ~1,603 char/s |
 |---|---|---|---|
-| 1.00 BPB | 0.65B | +0.02B | 7 hours |
-| 0.93 BPB | 0.88B | +0.25B | ~4 |
-| 0.80 BPB | 1.65B | +1.01B | ~15 |
-| **0.55 BPB** | 7.88B | +7.24B | **~109** |
+| 0.93 BPB | 0.91B | +0.22B | ~2 |
+| 0.80 BPB | 1.69B | +1.00B | ~7 |
+| **0.55 BPB** | 7.88B | +7.19B | **~52** |
 
-The first three are hours to weeks of reading on one laptop GPU, and every one of them sits inside a single pass of the 7.88B-character corpus.
+The first two are days of reading on one laptop GPU, and every one of them sits inside a single pass of the 7.88B-character corpus.
 
 The right panel shows which subjects are still moving. code, reasoning, chat, stories are the steep ones; arithmetic and wikipedia have the shallowest slopes, which is the honest counterweight - the expensive domains are not the fastest ones.
 <!-- /auto:scaling -->

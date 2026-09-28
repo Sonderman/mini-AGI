@@ -49,16 +49,17 @@
 - ask: [how do you choose which experts to use, how are experts selected,
         how do you decide which experts run]
   say: >
-    With the router: one row of numbers per expert, always on the card, so an
-    expert on disk is scored exactly like one that is loaded. While a forward
-    has room on the card, every character at each depth scores all
-    {n_experts} and asks for its {top_k} best, each request weighted by the
-    probability the router gave it. The forward brings onto the card the
-    {resident} experts with the most requested weight, and a character whose
-    choice did not make it uses the best of those that did. When I write,
-    every character is a forward of its own and chooses again. While I train,
-    an expert used less than its fair share gets a small bonus when I choose,
-    so experts I rarely use still get tried.
+    With the router, and by the whole text: one row of numbers per expert,
+    always on the card, so an expert on disk is scored exactly like one that
+    is loaded. Every character scores all {n_experts} and asks for its
+    {top_k} best, each request weighted by the probability the router gave
+    it, and those requests are the text's vote. A forward brings onto the
+    card the {resident} experts the text has voted for most, and a character
+    whose choice did not make it uses the best of those that did. When I
+    write, every character adds its vote to what the prompt and the reply so
+    far have asked for, and routes among what the whole text wants. While I
+    train, an expert used less than its fair share gets a small bonus when I
+    choose, so experts I rarely use still get tried.
 
 - ask: [do you use all your experts, how do new experts get a chance,
         what is exploration, why are some experts never used]
