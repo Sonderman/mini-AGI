@@ -86,7 +86,7 @@ pool:
   # to nothing when busy. It never changes how much a chosen expert
   # contributes, and the prune clock counts only what the router would have
   # admitted without it: being tried keeps nothing alive, being wanted does.
-  explore_bias: 0.5       # logits; 0 turns exploration off 
+  explore_bias: 0.65      # logits; 0 turns exploration off 
                           # (the higher the number is the more reads from the disk 
                           # are expected, so the reading/writing speed would be less)
   explore_steps: 1000     # training steps "recent use" is averaged over
