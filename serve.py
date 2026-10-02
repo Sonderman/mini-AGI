@@ -890,8 +890,14 @@ def main():
         # Both numbers are the POOL. Comparing model.n_params(), which counts
         # the trunk plus whatever is resident, against the pool total reads as
         # the card holding more than the model has.
+        # A directory written while non-paged (a fresh create, or an older
+        # classic save) loads as a SharedPool, which materialises every
+        # expert - there the whole pool is on the card and vram_params does
+        # not exist. Only a paged pool has it.
+        vram = (pool.vram_params() if hasattr(pool, "vram_params")
+                else pool.n_params())
         print(f"  {pool.n_experts()} experts, "
-              f"{pool.vram_params() / 1e6:.1f}M of {pool.n_params() / 1e6:.1f}M "
+              f"{vram / 1e6:.1f}M of {pool.n_params() / 1e6:.1f}M "
               f"on the card, context {model.cfg.block:,}")
     else:
         print(f"  {model.n_params() / 1e6:.1f}M parameters, "
