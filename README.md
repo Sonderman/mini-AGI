@@ -12,7 +12,7 @@ It stores its weights as ordinary files on disk and pages them onto the card as 
 
 [History](runs/samples.txt) - here is the samples from the whole training run history so far. You can inspect them yourself to see how the model improved over the course of training/reading the corpus. 
 
-The weights are **not published yet**. The run is still reading its first pass over the corpus, the weights go up once it has been through all of it, which is several weeks away at the current rate.
+The "final" weights are **not published yet**. The run is still reading its first pass over the corpus, the weights go up once it has been through all of it, which is several weeks away at the current rate. If you would like to play with undertrained weights as they are right now, you can find the most recent snapshot here: [Volotat/mini-AGI-undertrained](https://huggingface.co/Volotat/mini-AGI-undertrained/tree/main)
 
 <!-- auto:run-blocks -->
 <details>
@@ -20,118 +20,140 @@ The weights are **not published yet**. The run is still reading its first pass o
 
 ![training progress](assets/training_progress.png)
 
-*Every sample round of the run to date: 885.6M characters over 1,552 evaluations.*
+*Every sample round of the run to date: 1,042.4M characters over 1,690 evaluations.*
 
 </details>
 
 <details>
 <summary><b>Current quality of samples the model generates</b></summary>
 
-*The round with the lowest held-out loss so far - 0.6684 nats at 881.2M characters. Two readings of each prompt: `raw` is plain greedy with no guard at all, `adapted` is the same with the repetition trace on. The whole history is in [runs/samples.txt](runs/samples.txt).*
+*The round with the lowest held-out loss so far - 0.6534 nats at 1,042.4M characters. Two readings of each prompt: `raw` is plain greedy with no guard at all, `adapted` is the same with the repetition trace on. The whole history is in [runs/samples.txt](runs/samples.txt).*
 
 ```
 ==============================================================================
-step 430,619   881.2M of 7,880M characters (11.18%)   308 min   128 experts
-context 4,096 characters of 4,096   reading 1,948 char/s   writing 18.2 char/s   still gaining +0.0097 deep into it
-grad norm 1.31 against a clip of 1   clipping
-train loss 0.5659   lr 3.48e-05   evidence t +3.17 over 65.7 (effect +0.0704)   rate x0.116
-held-out loss 0.6684 +/-0.0291 nats   0.9644 bits/char   perplexity 1.95   gap +0.1025
-  arithmetic 0.623   chat 0.633   chat_hermes 0.947   chess 0.479   code 0.552   reasoning 0.575   stories 0.452   wikipedia 1.086
-repeats 19% of 8-grams, greedy with no guard
+step 509,333   1042.4M of 7,880M characters (13.23%)   209 min   149 experts
+context 4,096 characters of 4,096   reading 1,681 char/s   writing 17.7 char/s   still gaining +0.0082 deep into it
+grad norm 1.30 against a clip of 1   clipping
+train loss 0.5349   lr 2.19e-05   evidence t +2.61 over 65.7 (effect +0.0579)   rate x0.073
+held-out loss 0.6534 +/-0.0291 nats   0.9426 bits/char   perplexity 1.92   gap +0.1185
+  arithmetic 0.624   chat 0.629   chat_hermes 0.924   chess 0.432   code 0.552   reasoning 0.562   stories 0.433   wikipedia 1.071
+repeats 16% of 8-grams, greedy with no guard
 ==============================================================================
 
 --- stories ---
 prompt: 'Once upon a time, there was a little boy named Tom. One day he '
-[raw]  repeated 8-grams 2%
-went to the park with his mom. He saw a big tree and wanted to play with it. He ran and jumped and have fun. 
+[raw]  repeated 8-grams 15%
+went to the park with his mom and dad. Tom was very excited because he was going to the park with his mom. He was so excited to see the play
+[adapted]  repeated 8-grams 3%
+was playing with his ball. He was very happy. He wanted to show it to his fma.
 
-As he was playing, he saw a b
-[adapted]  repeated 8-grams 16%
-was playing with his friend, a little boy. They wanted to play, but his friend was too little.
-
-Tom was very sad. He wanted to play, but his
+Tom's mom and dad told him to behave. Tom's dad wanted to he
 
 --- code ---
 prompt: 'def merge_sorted(a, b):\n    '
-[raw]  repeated 8-grams 80%
-"""
-    Compute the sorted sorted sorted sorted sorted sorted sorted sorted sorted sorted sorted sorted sorted sorted sorted sorted sorted s
-[adapted]  repeated 8-grams 2%
-"""Returns an implementation of all sorted arguments.
-
-    There's anything of which arguments are positive.
+[raw]  repeated 8-grams 29%
     """
-    return a.sort()
-</bot>
-<user>
+        Merge a sorted array of sorted arrays into a sorted array.
+
+        Args:
+            a (optional): A sorted array of sorted
+[adapted]  repeated 8-grams 59%
+"""
+    Returns:
+    ---
+    These arguments:
+    --columns:
+    --columns:
+    --columns:
+    --columns:
+    --columns:
+    --columns:
+    
 
 --- arithmetic ---
 prompt: 'add 4917 + 388 = '
-[raw]  repeated 8-grams 15%
+[raw]  repeated 8-grams 37%
 <think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 4+0+1=5c0 </think> 5305
-add 94 + 9 = 103
-add 94 + 9 = <think> 4+9+0=3c1 9+0+1=0c1 c1 </think> 103
-add 9 + 9 = 18
-add 9 + 9 = 18
-
+add 72 + 1 = 73
+add 72 + 1 = 73
+add 72 + 1 = 73
+add 72 + 1 = 73
+add 7 + 1 = 8
+add 7 + 1 = 8
 [adapted]  repeated 8-grams 1%
 <think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 4+0+1=5c0 </think> 5305
-add 6487921 + 305648 = <think> 1+8+0=9c0 2+4+0=6c0 9+6+0=5c1 7+5+1=3c1 8+0+1=9c0 4+3+0=7c0 6+0+0=
+add 7286941 + 307285 = <think> 1+5+0=6c0 4+8+0=2c1 9+2+1=2c1 6+7+1=4c1 8+0+1=9c0 2+3+0=5c0 7+0+0=
 
 --- chat ---
 prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
-[raw]  repeated 8-grams 2%
-In a directory, one file per expert. That directory is not a copy of me — it is me. When I grow an expert a new file appears; when one is 
-[adapted]  repeated 8-grams 2%
-In a directory, one file per expert. That directory is not a copy of me — it is me. When I grow an expert a new file appears; when one is 
+[raw]  repeated 8-grams 3%
+It's 1. A point of 2. It keeps a running share of the whole pool of 10 each of 20 positions of them at a point of 2.
+</bot>
+<user>
+Write a story about
+[adapted]  repeated 8-grams 10%
+It's 1.7 million parameters
+.. The position of the given positions in 1.7 million characters?
+</bot>
+<user>
+What is 102439 + 7618?
+</user>
+<bot>
+705431
+</bot>
+<user>
+296 
 
 --- chat_hermes ---
 prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
-[raw]  repeated 8-grams 23%
-To find the speed of the train in km/h, we need to find the speed of the train in km/h. We can use the following steps:
+[raw]  repeated 8-grams 5%
+To answer this question, we need to determine the value of x, which represents the train traveling at the top of the train.
 
-1. Initialize a tra
-[adapted]  repeated 8-grams 4%
-To find the speed of this train, we can use the following steps:
+First, we need 
+[adapted]  repeated 8-grams 2%
+To answer this question, we need to determine the value of x, which represents the number of km/h trains traveling in km/h.
 
-1. Initialize a variable to know if there's any potential speed of the tra
+First, we need 
 
 --- reasoning ---
 prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
-[raw]  repeated 8-grams 2%
-Okay, let's try to solve this programming problem. So, we need to determine which number I need to return to the list. The problem is about 
-[adapted]  repeated 8-grams 0%
-Okay, let's try to solve this programming problem. So, we need to find all the numbers in a list. There's any list, which means that every n
+[raw]  repeated 8-grams 4%
+Okay, let's try to figure out how lists are in a list. So, the problem is about returning the largest number in a list. The first line is th
+[adapted]  repeated 8-grams 1%
+Okay, let's try to figure out how lists are involved. So, there's another way to approach this. Let's break this down.
+
+First, let's underst
 
 --- wikipedia ---
 prompt: '== History ==\nThe [[Roman Empire]] was '
-[raw]  repeated 8-grams 49%
-founde100 years of president of the [[Roman Empire]].  The [[Roman Empire]] was founde100 years of president of the [[Roman Empire]].  The [
-[adapted]  repeated 8-grams 10%
-founde10,568. The [[Roman Empire|Roman]] was founded in [[1987]].
-
-== Geography ==
-The city is located in [[Christmas]]. The city is located
+[raw]  repeated 8-grams 45%
+founde10 miles in the [[United States]] and was founde10 miles in the [[United States]] and was founded in [[1990]] as a [[United States]] a
+[adapted]  repeated 8-grams 27%
+founde10,528 km².
+The [[... standard]] was founde10,204 km².
+The [[... standard]1 was founded in 1980.
+The [[Roman Empire]] was founded in
 
 --- chess ---
 prompt: '<g>1700 1-0 1. e4 e5 2. '
-[raw]  repeated 8-grams 0%   14 legal moves, then Be3
-Nf3 Nc6 3. Bc4 Bc5 4. O-O Nf6 5. d3 O-O 6. Bg5 h6 7. Bh4 Be7 8. Nc3 Nh7 9. Be3 Ng5 10. Bxf7+ Kxf7 11. Nxe5+ Ke8 12. Nxg6 Nxg6 13. Qd2 Nf4 14
-[adapted]  repeated 8-grams 0%   16 legal moves, then Nxf4
-Nf3 Nc6 3. Bb5 a6 4. Bxc6 dxc6 5. O-O Nf6 6. d3 Be7 7. Nbd2 O-O 8. Ne1 Re8 9. f4 exf4 10. Nxf4 Bd6 11. Ng3 Be5 12. Nxe5 Qxe5 13. Nf5 Qd4+ 14
+[raw]  repeated 8-grams 0%   24 legal moves, then Nd
+d3 d6 3. f4 c5 4. fxe5 dxe5 5. Nf3 Bg4 6. Be2 Nc6 7. O-O Nf6 8. h3 Bh5 9. Nc3 Be7 10. Bg5 O-O 11. Qd2 Qd7 12. Rad1 Rad8 13. Bxf6 Bxf6 14. Nd
+[adapted]  repeated 8-grams 0%   24 legal moves, then Be
+d3 Nf6 3. h3 Bc5 4. Nf3 d6 7. Be2 h6 8. O-O Be6 9. c3 Nbd7 10. a4 a5 11. Be3 c6 12. Nbd2 Qc7 13. Nh2 O-O-O 14. Ng4 Bxg4 15. Bxg4+ Kb8 16. Be
 
 --- self-knowledge ---
 prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
-[raw]  repeated 8-grams 1%
-A small term pushes routing to spread across the experts on the card rather than piling onto a few, so that one expert does not absorb every
-[adapted]  repeated 8-grams 1%
-A small term pushes routing to spread across the experts on the card rather than piling onto a few, so that one expert does not absorb every
+[raw]  repeated 8-grams 3%
+</g>
+<g>1100 1. 1 mor 2. 2. 24 m. 3. 2... 3. 3. 3. 3. d5 4. e4 4... dxe4 5. d3 5... exd3 6. Bxd3 6... Nf6 7. Ne2 7... e5 8. O-O 8... Be7 9. Nbc3 
+[adapted]  repeated 8-grams 4%
+</g>
+<g>1700 1.0 12... c56 2. 2. d5 3. <think> 3... e5 3. d4 4... e4 . 4.., a6 5. a4 5... b6th-... 2., 3. <think> e3 7... 3., 3. 3..a 3..- <think> silenetedges by
 ```
 
 </details>
 <!-- /auto:run-blocks -->
 
-If you would like to play with undertrained weights as they are right now, you can find the most recent snapshot here: [Volotat/mini-AGI-undertrained](https://huggingface.co/Volotat/mini-AGI-undertrained/tree/main)
 
 ## Motivation
 
@@ -208,13 +230,13 @@ Three rules the project holds to:
 
 **What was on the card before changes the cost, never the choice.** Admission reads only the text and the weights, so the same text admits the same experts whatever was read before it; history decides only how many of them have to be loaded. And because the rows that admit experts are the rows that route every character, admission is learned by the ordinary gradient. When a character mixes its experts, the loss raises the router score of each one whose output helped more than the mixture as a whole and lowers the score of each that helped less. Only the rows of experts the window admitted receive that signal, and the next text whose states look like those asks more strongly for the experts that helped.
 
-**While it trains, the model also explores.** That gradient only reaches experts that get chosen, and the router's scores are flat enough that most of the pool sat just under the cut: over 30 real training windows, 45 of the 50 experts on trial were never admitted, and only 67 of the 170 were used at all. So every expert keeps a running share of the recent training forwards that admitted it, and when a forward that trains chooses - what a character asks for, and the eight it takes - each expert's router score gets a bonus of `explore_bias × e^(−share / fair share)`, the fair share being 32 over the pool size. An expert nothing has used lately gets the whole bonus, 0.35 logits by default; one used at its fair share, about a third of it; a busy one, next to nothing. The bonus changes which experts are chosen, never how much a chosen one contributes - the weights stay the router's own softmax, the trick [DeepSeek-V3 uses to balance experts without an auxiliary loss](https://arxiv.org/abs/2408.15664). A character that picks an under-used expert sends the gradient into its router row, its gate and its weights like any other: if it helped more than the mixture its row climbs toward being chosen without the bonus, if it helped less the row sinks. Measuring and writing never explore - they use the router's own choice.
+**While it trains, the router is taught to use the whole pool.** That gradient only reaches experts that get chosen, and left alone the router keeps choosing the same ones: reading held-out text on its own, it put just 59 of its 118 experts on a card across every subject. So the loss carries a balance term - the [Switch Transformer's](https://arxiv.org/abs/2101.03961), with one change. Every expert keeps a running share of the recent training forwards that admitted it, and every forward that trains pays, on the router's probability for each expert over the whole pool, in proportion to that share: `balance × (experts × Σ share × probability − 1)`, zero when use is even. Probability on a busy expert costs more than on an idle one, so the router's rows move toward the idle. Switch charges each expert by its share of the current batch; here the share is taken over the last thousand or so training forwards, because a training window is one text and a text should be free to want few experts - what has to be even is the use across texts. Only the router's rows learn from it, since the characters' states are detached, so it cannot bend what the trunk computes. And because it changes the router itself, reading and writing choose the way training does. In a 15-minute test at weight 0.01, the experts the router put on a card across held-out rose from 59 to 114, at a cost of 0.023 in held-out loss over those minutes. The exploration bonus it replaced acted only while training: over the same 15 minutes it spread the training work across 116 experts, while the model reading on its own still used 58. The weight sets how hard the term leans against learning the text on the experts in use - an expert no text admits gets no other gradient, so Adam moves its row at the usual pace whatever the weight - and the default is gentler, 0.003.
 
 ## How growth and pruning work
 
 The pool grows when it is short of capacity and shrinks when parts of it stop being asked for.
 
-New experts are added on speculation, at a small gate so they change almost nothing, and kept only if something goes on asking for them. A new expert is built by **recombination** - whole hidden units taken from several existing experts - because a clone of one parent is not novel enough to be worth routing to, and a random expert computes nothing worth routing to. What works is novelty assembled from trained parts. Its router row is its parents' rows averaged, weighted by how many units each gave, so it starts out scoring every character with the same weighted average of its parents' scores - and since nothing has used it yet, it starts with the whole exploration bonus, so the training forwards that follow try it.
+New experts are added on speculation, at a small gate so they change almost nothing, and kept only if something goes on asking for them. A new expert is built by **recombination** - whole hidden units taken from several existing experts - because a clone of one parent is not novel enough to be worth routing to, and a random expert computes nothing worth routing to. What works is novelty assembled from trained parts. Its router row is its parents' rows averaged, weighted by how many units each gave, so it starts out scoring every character with the same weighted average of its parents' scores - and since nothing has used it yet, the balance term pulls its row up from the first training forward after its birth, until texts start admitting it.
 
 Growth is refused unless every brake agrees:
 
@@ -224,7 +246,7 @@ Growth is refused unless every brake agrees:
 - **fits** - not too many experts are already inside their trial
 - **honest** - train and held-out have not separated
 
-**Dead means unaddressed.** Both the growth brake and the pruner read how long it has been since the router itself last admitted an expert, and never its gate. Admissions that happen only because of the exploration bonus do not count: being tried keeps nothing alive, being wanted does. This is the single most useful finding in the repository: the gate is not merely uninformative here, it is anti-predictive. The smallest gates belong to the *busiest* experts - one that behaves as a sink, chosen constantly and contributing little per character, reads as dead on a gate test, while a high-gate expert nothing has asked for in a long time reads as alive.
+**Dead means unaddressed.** Both the growth brake and the pruner read how long it has been since a forward last admitted an expert, and never its gate: being used is being alive. This is the single most useful finding in the repository: the gate is not merely uninformative here, it is anti-predictive. The smallest gates belong to the *busiest* experts - one that behaves as a sink, chosen constantly and contributing little per character, reads as dead on a gate test, while a high-gate expert nothing has asked for in a long time reads as alive.
 
 A new expert is safe for a full survival window no matter what, so it cannot be judged before it has had a chance to be chosen. When the model grows an expert a new file appears; when it prunes one, that file is deleted. 
 
@@ -357,25 +379,25 @@ The numbers below are for tracking purposes and move as the run continues. Held-
 There is a second variance underneath these figures. The same configuration run twice lands about 0.014 apart, because the expert dispatch is not deterministic on CUDA. **Treat about 0.03 as the threshold for a real difference**, not the error bar printed beside one score.
 
 <!-- auto:benchmarks -->
-**Where the model is** (885.6M characters read, 128 experts):
+**Where the model is** (1,042.4M characters read, 149 experts):
 
 | | nats/char | bits/byte |
 |---|---|---|
-| **held-out, all 8 subjects** | **0.6712** ± 0.0292 | **0.9683** |
-| train | 0.5409 | 0.7804 |
+| **held-out, all 8 subjects** | **0.6534** ± 0.0291 | **0.9426** |
+| train | 0.5349 | 0.7717 |
 
 **Held-out loss per subject:**
 
 | Subject | nats/char | bits/byte |
 |---|---|---|
-| `stories` | 0.450 | 0.649 |
-| `chess` | 0.489 | 0.705 |
-| `code` | 0.553 | 0.798 |
-| `reasoning` | 0.579 | 0.835 |
-| `arithmetic` | 0.625 | 0.902 |
-| `chat` | 0.634 | 0.915 |
-| `chat_hermes` | 0.947 | 1.366 |
-| `wikipedia` | 1.093 | 1.577 |
+| `chess` | 0.432 | 0.623 |
+| `stories` | 0.433 | 0.625 |
+| `code` | 0.552 | 0.796 |
+| `reasoning` | 0.562 | 0.811 |
+| `arithmetic` | 0.624 | 0.900 |
+| `chat` | 0.629 | 0.907 |
+| `chat_hermes` | 0.924 | 1.333 |
+| `wikipedia` | 1.071 | 1.545 |
 <!-- /auto:benchmarks -->
 
 ### Data Scaling
@@ -385,19 +407,19 @@ There is a second variance underneath these figures. The same configuration run 
 
 Every point on this chart is a **bits-per-byte on the PG19 test split** - one held-out set, so the comparison is direct. This model scores **2.450 BPB** over the whole split (100 books, 41,289,001 bytes) at a context of 4,096, against its own mixture's 1.16. PG19 is out of distribution for it: it was trained on a corpus assembled for this project and has read no Victorian novels, so much of that gap is subject matter rather than capability.
 
-**The results so far are promising.** The red line is the fitted power law on this model's own held-out, `L ∝ D^-0.243` with R² 0.98 over every point past the warmup - between Kaplan's 0.095 and Chinchilla's 0.28, and it has held for more than a decade of data. How steep it looks depends on where the fit starts, and the band on the chart spans that range rather than pretending to one number.
+**The results so far are promising.** The red line is the fitted power law on this model's own held-out, `L ∝ D^-0.239` with R² 0.98 over every point past the warmup - between Kaplan's 0.095 and Chinchilla's 0.28, and it has held for more than a decade of data. How steep it looks depends on where the fit starts, and the band on the chart spans that range rather than pretending to one number.
 
-Read straight off that trend, on this model's own mixture. It has read 0.89B characters so far, in about 12 days of running. The days below assume the pace of the last 6 hours of it: 1,477 characters a second on the wall clock, held-out checks and rounds of samples included, because the reading waits for them.
+Read straight off that trend, on this model's own mixture. It has read 1.04B characters so far, in about 13 days of running. The days below assume the pace of the last 3 hours of it: 1,260 characters a second on the wall clock, held-out checks and rounds of samples included, because the reading waits for them.
 
-| held-out | total data read | further reading | days from here at ~1,477 char/s |
+| held-out | total data read | further reading | days from here at ~1,260 char/s |
 |---|---|---|---|
-| 0.93 BPB | 1.05B | +0.16B | ~1 |
-| 0.80 BPB | 1.95B | +1.06B | ~8 |
-| **0.57 BPB** | 7.88B | +6.99B | **~55** |
+| 0.93 BPB | 1.10B | +0.06B | 13 hours |
+| 0.80 BPB | 2.07B | +1.03B | ~9 |
+| **0.58 BPB** | 7.88B | +6.84B | **~63** |
 
-The first two are days of reading on one laptop GPU, and every one of them sits inside a single pass of the 7.88B-character corpus.
+The first two are hours to days of reading on one laptop GPU, and every one of them sits inside a single pass of the 7.88B-character corpus.
 
-The right panel shows which subjects are still moving. reasoning, code, chat, stories are the steep ones; arithmetic and wikipedia have the shallowest slopes, which is the honest counterweight - the expensive domains are not the fastest ones.
+The right panel shows which subjects are still moving. reasoning, code, stories, chat are the steep ones; arithmetic and chess have the shallowest slopes, which is the honest counterweight - the expensive domains are not the fastest ones.
 <!-- /auto:scaling -->
 
 ## Running it
@@ -532,7 +554,7 @@ total     558.9M
 
 ## AI usage
 
-This project was assisted by "Claude Opus 5" model. The model did implemented most of code of this project, verified and debugged it when it was necessary. The model was searching for published papers related to the problems that the project were trying to solve, build tests and experiments, and help with brainstorming the complex problems that arose along the way. The animations, graphs and other media you see here are all done by Claude as well form the real data traces. While I myself provided main ideas, steering, intuition, rejections when thing went in a wrong direction, code monitoring and verification, as well as decisions and strong opinions of how everything should be wired together and work in principle. Documentation was written in tandem.  
+This project was assisted by "Claude Opus" 5 and 5.5 models. The model did implemented most of code of this project, verified and debugged it when it was necessary. The model was searching for published papers related to the problems that the project were trying to solve, build tests and experiments, and help with brainstorming the complex problems that arose along the way. The animations, graphs and other media you see here are all done by Claude as well form the real data traces. While I myself provided main ideas, steering, intuition, rejections when thing went in a wrong direction, code monitoring and verification, as well as decisions and strong opinions of how everything should be wired together and work in principle. Documentation was written in tandem.  
 
 ## Acknowledgments
 

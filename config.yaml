@@ -78,18 +78,41 @@ pool:
   capacity_factor: 1.5    # most of a batch one expert may take, as a multiple
                           # of its fair share; the rest is dropped. 0 removes
 
-  # EXPLORATION, only in forwards that train. An expert used less than its
-  # fair share of recent training forwards (resident / experts) gets a bonus
-  # on its router score wherever something is chosen - what a character asks
-  # for, and the top_k it takes - of explore_bias * exp(-its share / fair
-  # share): the whole bonus at no use, a third of it at the fair share, next
-  # to nothing when busy. It never changes how much a chosen expert
-  # contributes, and the prune clock counts only what the router would have
-  # admitted without it: being tried keeps nothing alive, being wanted does.
-  explore_bias: 0.65      # logits; 0 turns exploration off 
-                          # (the higher the number is the more reads from the disk 
-                          # are expected, so the reading/writing speed would be less)
-  explore_steps: 1000     # training steps "recent use" is averaged over
+  # THE BALANCE TERM - how the whole pool gets used. Left alone the router
+  # keeps choosing the same experts: reading held-out on its own it put 59 of
+  # 118 on a card across every subject. This term in the loss charges the
+  # router, in every forward that trains, for the probability it puts on each
+  # expert over the whole pool, in proportion to that expert's share of recent
+  # admissions (the last ~1,000 training forwards). Busy experts get dearer and
+  # idle ones cheaper, so the router's own rows move toward the idle - and
+  # reading and writing use them too, not only training. A text is still free
+  # to want few experts; what gets evened out is use across texts.
+  #
+  # The weight sets how hard it leans against learning the text on the experts
+  # in use. An expert no text admits gets no other gradient, so Adam moves its
+  # row at the usual pace whatever the weight. 0 turns it off. In a 15-minute
+  # test 0.01 took the experts in use on held-out from 59 to 114, at a cost of
+  # 0.023 in held-out loss over those minutes.
+  balance: 0.001
+
+  # THE TEMPERATURE OF EXPERT SELECTION - which experts compute a character,
+  # NOT which character comes out. Characters are always chosen greedily; any
+  # randomness in what the model writes comes from here.
+  #
+  #   0     threshold selection, the rule as it has run: the card holds the
+  #         32 experts the text's first row asks for most, and every character
+  #         takes its own top 8 of those
+  #   > 0   drawn: at each row, 8 experts are drawn from the text's
+  #         probabilities (the router's full distribution, summed over every
+  #         character in the context window) in proportion to p^(1/T), until
+  #         the card's 32 are full, and every character draws its own 8 from
+  #         its own probabilities over the card, the same way
+  #
+  # 1 draws in proportion to the router's probabilities, 0.5 to their
+  # squares, 0.2 to their fifth powers. Close to 0 the draws approach each
+  # row's top 8 - which is not quite 0 itself: a drawn card fills 8 a row, so
+  # the first row has only 8 experts where 0 gives it all 32.
+  select_temperature: 0
 
 training:
   save_every: 5           # minutes between checkpoints
@@ -119,8 +142,8 @@ growth:
 
   max_gap: 0.4            # HONEST: train minus held-out. 0 disables
 
-  # USED. Staleness is a share of prune.survival_chars: 0.0 when something
-  # asks for an expert, 1.0 when it has gone long enough unasked to be
+  # USED. Staleness is a share of prune.survival_chars: 0.0 when a forward
+  # admits an expert, 1.0 when it has gone long enough unadmitted to be
   # deleted. Past prune.dying_at it counts as dying.
   dying_frac_max: 0.35    # stop growing once this share of the pool is dying
 

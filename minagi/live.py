@@ -144,6 +144,8 @@ class LiveLearner:
                     torch.tensor([ids[1:]], device=dev))
                 if self.aux_weight and getattr(self.model, "pool", None):
                     loss = loss + self.aux_weight * self.model.pool_aux()
+                if hasattr(self.model, "pool_balance"):
+                    loss = loss + self.model.pool_balance()
             loss.backward()
             gn = float(torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(), self.clip))

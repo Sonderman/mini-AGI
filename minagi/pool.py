@@ -369,13 +369,11 @@ class PooledMLP(nn.Module):
         n = p.n_routable() if hasattr(p, "n_routable") else p.n_experts()
         flat = x.reshape(-1, D)
         rows = p.resident_rows() if hasattr(p, "resident_rows") else None
-        # EXPLORATION, only in a forward that trains: a bonus per expert for
-        # being used less than its fair share (PagedPool.begin_forward). It is
-        # added to the router's scores wherever something is CHOSEN - what a
-        # character asks for, and the top_k it takes - and nowhere else: how
-        # much a chosen expert contributes is always the router's own softmax.
-        bias = p.selection_bias() if hasattr(p, "selection_bias") else None
-        pick = None
+        # THE TEMPERATURE OF EXPERT SELECTION - pool.select_temperature, not
+        # anything about the text. 0 takes each character's top_k; above 0
+        # each character DRAWS its top_k without replacement, in proportion to
+        # p^(1/T), and the card is drawn the same way (PagedPool._draw).
+        temp = float(getattr(p, "select_temperature", 0.0) or 0.0)
         if rows is None:
             logits = self.router(flat + self.depth_emb)[:, :n].float()
         else:
@@ -393,19 +391,35 @@ class PooledMLP(nn.Module):
 
                     def requested(scores):
                         q = F.softmax(scores, -1)
+                        if temp > 0:
+                            # every expert with its full probability: above
+                            # temperature 0 the card is drawn from the
+                            # text's whole distribution, row by row
+                            return q.float().sum(0)
                         tq = torch.topk(q, min(self.top_k, E), dim=-1)
                         mass = torch.zeros(E, device=q.device)
                         mass.index_add_(0, tq.indices.reshape(-1),
                                         tq.values.reshape(-1).float())
                         return mass
-                    if bias is None:
-                        mass, merit = requested(z), None
-                    else:
-                        # the bonus decides what is admitted; what the router
-                        # alone would have asked for is kept for the prune
-                        # clock, which counts only that
-                        mass, merit = requested(z + bias[:E]), requested(z)
-                p.admit(mass, merit)
+                    mass = requested(z)
+                # THE BALANCE TERM (pool.balance), once per forward that
+                # trains: the router pays for the probability it puts on each
+                # expert in proportion to that expert's share of recent
+                # admissions - the Switch Transformer's balancing term, with
+                # the share taken over the last ~1,000 training forwards
+                # instead of this one, so a text may still want few experts as
+                # long as the texts between them want them all. 0 when usage is
+                # even. Only the router's rows learn from it: the characters'
+                # states are detached, so it cannot bend what the trunk computes.
+                if (float(getattr(p, "balance", 0.0) or 0.0) > 0
+                        and self.training and torch.is_grad_enabled()
+                        and p.balance_term() is None):
+                    zg = F.linear((flat + self.depth_emb).detach(),
+                                  self.router.weight[:E]).float()
+                    P = F.softmax(zg, -1).mean(0)
+                    p.note_balance(p.balance * (
+                        E * (p.usage_share().to(P.device) * P).sum() - 1.0))
+                p.admit(mass, draw=self.top_k)
                 rows = p.resident_rows()
             # only the rows belonging to the experts in VRAM, in slot order,
             # so column j of the logits is slot j and row rows[j] is its expert
@@ -414,18 +428,18 @@ class PooledMLP(nn.Module):
             # a character whose request was not admitted takes its best
             # admitted expert: slots holding anything else are out of reach
             logits = logits.masked_fill(~p.admitted_mask(), float("-inf"))
-            if bias is not None:
-                pick = bias[rows]
         probs = F.softmax(logits, dim=-1)
         k = min(self.top_k, n)
-        if pick is None:
-            w, idx = torch.topk(probs, k, dim=-1)
-        else:
-            # chosen by score plus bonus; weighted by the router's own
-            # probabilities, so the gradient that reaches a chosen expert's
-            # row is the same as if it had been chosen on its score alone
-            idx = torch.topk(logits.detach() + pick, k, dim=-1).indices
+        if temp > 0:
+            # drawn, not taken (Gumbel-top-k on the scores over T): weighted,
+            # like a taken expert, by the router's own probability
+            keys = logits.detach()
+            gum = -torch.log(-torch.log(
+                torch.rand_like(keys).clamp_(1e-12, 1 - 1e-7)))
+            idx = torch.topk(keys / temp + gum, k, dim=-1).indices
             w = probs.gather(1, idx)
+        else:
+            w, idx = torch.topk(probs, k, dim=-1)
         # the share of the router's distribution that top-k actually captures,
         # measured BEFORE normalisation - afterwards it sums to 1 by
         # construction and carries no information

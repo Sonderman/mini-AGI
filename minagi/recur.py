@@ -140,6 +140,14 @@ class RecurCoder(nn.Module):
         return torch.stack(t).mean() if t else torch.zeros(
             (), device=self.tok_emb.weight.device)
 
+    def pool_balance(self):
+        """The balance term the last forward computed, already weighted
+        (PagedPool.note_balance) - zero when it computed none."""
+        t = getattr(self.pool, "balance_term", None)
+        v = t() if t is not None else None
+        return v if v is not None else torch.zeros(
+            (), device=self.tok_emb.weight.device)
+
     def pool_dropped(self, reset=True):
         """
         Share of token-expert assignments the capacity bound discarded.
@@ -208,9 +216,10 @@ class RecurCoder(nn.Module):
             # begins a new text, with an empty vote, and is what the prune
             # clock counts. See PagedPool.admit.
             #
-            # A forward that trains also explores: its selection favours the
-            # experts used least of late (PagedPool.begin_forward). Measuring
-            # and writing never do - they use the router's own choice.
+            # A forward that trains says so: it counts towards each expert's
+            # recent use and computes the balance term (PagedPool.note_balance).
+            # Choosing is the router's alone in every forward, so measuring and
+            # writing choose the way training does.
             explore = self.training and torch.is_grad_enabled()
             if caches is None or pos_offset == 0:
                 self.pool.begin_text(explore)

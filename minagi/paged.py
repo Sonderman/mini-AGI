@@ -23,11 +23,20 @@ the prompt and the reply so far have voted for - the same choice a window
 over that text would make, cut off at the character being written. A single
 character never chooses for itself; training never asks it to.
 
-While training, the choice also EXPLORES: an expert used less than its fair
-share of recent training forwards gets a bonus on its router score wherever
-something is chosen, so rarely used experts get tried and trained. The bonus
-never changes how much a chosen expert contributes, and the prune clock counts
-only what the router would have admitted without it - see begin_forward.
+How the choosing is done has a temperature, pool.select_temperature, which
+is about experts and never about the text - characters are always chosen
+greedily. At 0 the card is the text's most-voted and every character takes
+its top 8. Above 0 both are drawn: at each row 8 experts are drawn from the
+text's probabilities until the card is full (_draw), and every character
+draws its 8 from its own, in proportion to p^(1/T).
+
+Left alone the router keeps choosing the same experts, so the WHOLE POOL is
+kept in use by a balance term in the loss (pool.balance): every forward that
+trains charges the router for the probability it puts on each expert, in
+proportion to that expert's share of recent admissions. It changes the router
+itself, so reading and writing choose the way training does - see
+note_balance. Whatever admits an expert resets its prune clock: being used is
+being alive.
 
 A forward is whatever the model computes at once - a training window, a chunk
 of held-out file, a prompt, and then each character of the reply. What is
@@ -296,28 +305,36 @@ class PagedPool(nn.Module):
         self._admitted = set()
         self._mask = None
         self.loads = 0            # experts brought onto the card, ever
-        # EXPLORATION, while training. Each expert's share of recent training
-        # forwards that admitted it, and the bonus its selection score gets
-        # for being used less than its fair share: explore_bias * exp(-share
-        # / fair share), fair share being resident / experts. Computed once
-        # per training forward; None in every other forward. See begin_forward.
+        # HOW MUCH EACH EXPERT HAS BEEN USED LATELY: its share of recent
+        # training forwards that admitted it, a running average over
+        # `usage_steps` of them. Every forward that trains updates it.
         self.register_buffer("recent", torch.zeros(n_experts),
                              persistent=False)
-        self.explore_bias = 0.0          # the bonus at zero use, in logits
-        self.explore_steps = 1000.0      # how far back `recent` looks
-        self._bias = None
-        self._exploring = False
-        # what the router alone would have admitted this forward - the only
-        # admissions the prune clock counts
-        self._merited = set()
+        self.usage_steps = 1000.0        # how far back `recent` looks
+        self._trains = False             # whether this forward trains
+        # THE BALANCE TERM - a term in the loss, `balance` its weight, that
+        # charges the router for the probability it puts on each expert in
+        # proportion to that expert's share of recent admissions. Computed by
+        # the call site in the first pass of a forward that trains; read by the
+        # model's pool_balance(). See note_balance.
+        self.balance = 0.0
+        self._balance = None
         # THE TEXT'S VOTE. Every forward's first pass adds its requests to it,
         # and a forward is admitted by the whole of it - so what a character
         # routes among is chosen by all of its text so far, the way a training
         # window's experts are chosen by all of the window. A new text starts
-        # it empty. `_merit_vote` is the same without the exploration bonus.
+        # it empty.
         self._vote = None
-        self._merit_vote = None
         self._voted = False
+        # THE TEMPERATURE OF EXPERT SELECTION (pool.select_temperature). 0 is
+        # the vote above. Above 0 the card is DRAWN row by row instead: at each
+        # row the text's probabilities - every character read since position
+        # 0, its full router distribution at that row - are summed into
+        # `_rows[row]`, and `draw` experts not yet admitted are drawn from that
+        # tally in proportion to tally^(1/T) until the card is full. See _draw.
+        self.select_temperature = 0.0
+        self._rows = {}
+        self._row = 0
 
     def _f(self, i):
         """Position in the pool's arrays -> the id its file is named by."""
@@ -488,72 +505,86 @@ class PagedPool(nn.Module):
         """
         A new forward: nothing admitted yet. The card keeps its contents.
 
-        `explore` is set for a forward that trains. Its selection bonus is fixed
-        here, from how much each expert has been used, and holds for the whole
-        forward - its backward recomputes the same choices - and `recent`
-        decays one step, to be topped up by what this forward admits.
+        `explore` is set for a forward that trains: `recent` decays one step,
+        to be topped up by what this forward admits, and the forward may
+        compute a balance term.
         """
         self._admitted = set()
-        self._merited = set()
         self._voted = False
+        self._row = 0
         self._mask = None
-        self._bias = None
-        self._exploring = bool(explore and self.explore_bias > 0)
-        if self._exploring:
-            n = self._n
-            fair = self.resident / max(n, 1)
-            self._bias = (self.explore_bias
-                          * torch.exp(-self.recent[:n] / fair)).to(
-                              self.gate.device, torch.float32)
-            self.recent[:n] *= 1.0 - 1.0 / self.explore_steps
+        self._balance = None
+        self._trains = bool(explore)
+        if self._trains:
+            self.recent[:self._n] *= 1.0 - 1.0 / self.usage_steps
 
     def begin_text(self, explore=False):
         """A forward from position 0: a new text. Its vote starts empty, and
         the prune clock counts it."""
-        self._vote = self._merit_vote = None
+        self._vote = None
+        self._rows = {}
         self.begin_forward(explore)
         self.segments += 1
 
-    def selection_bias(self):
+    def usage_share(self):
+        """Each expert's share of recent admissions, summing to 1 - even when
+        nothing has been used yet."""
+        n = self._n
+        r = self.recent[:n].float()
+        s = float(r.sum())
+        if s <= 0:
+            return torch.full((n,), 1.0 / max(n, 1), device=r.device)
+        return r / s
+
+    def note_balance(self, term):
         """
-        The bonus this forward adds to each expert's router score when choosing,
-        one entry per expert - or None when it is not exploring. It changes
-        which experts are asked for and which a character picks, never how much
-        a picked expert contributes.
+        The balance term a call site computed for this forward, weighted.
+
+        It is the Switch Transformer's balancing term with one change: each
+        expert is charged by its share of the last `usage_steps` training
+        forwards' admissions rather than of this forward's, because a forward
+        is one text and a text should be free to want few experts - what has
+        to be even is use across texts. Probability on a busy expert costs
+        more than on an idle one, so the router's rows move toward the idle,
+        and since it is the router itself that changes, reading and writing
+        choose the same way. Its weight sets how hard it leans against the
+        language-model gradient on experts in use; an expert no text admits
+        gets no other gradient, so Adam moves its row at the usual pace
+        whatever the weight.
         """
-        return self._bias
+        self._balance = term if self._balance is None else self._balance + term
+
+    def balance_term(self):
+        """This forward's balance term, or None when it has none."""
+        return self._balance
 
     def admitting(self):
         """Whether this forward may still admit experts."""
         return len(self._admitted) < self.resident
 
     @torch.no_grad()
-    def admit(self, mass, merit=None):
+    def admit(self, mass, draw=8):
         """
         Admit the most-requested experts, up to the card's capacity.
 
         `mass[e]` is the router probability this pass's requests put on
-        expert e. `merit` is the same without the exploration bonus, when
-        there is one: the experts it would have admitted are the ones the
-        prune clock counts, so being tried does not keep an expert alive and
-        being wanted does. Returns how many experts had to be loaded.
+        expert e. Every expert admitted has its prune clock reset: being used
+        is what keeps an expert alive. Returns how many experts had to be
+        loaded.
+
+        Above select_temperature 0 the experts are drawn instead, `draw` per
+        row - see _draw.
         """
+        if self.select_temperature > 0:
+            new = self._draw(mass, draw)
+            return self._place(new) if new else 0
         m = mass.detach().float().cpu()
-        mm = (mass if merit is None else merit).detach().float().cpu()
         if not self._voted:
             # this forward's first pass: its requests join the text's vote,
             # and the forward is admitted by the whole vote
             self._voted = True
             self._vote = _tally(self._vote, m)
-            self._merit_vote = _tally(self._merit_vote, mm)
-            m, mm = self._vote, self._merit_vote
-        mfree = self.resident - len(self._merited)
-        if mfree > 0:
-            morder = torch.argsort(mm, descending=True).tolist()
-            for e in [e for e in morder if float(mm[e]) > 0
-                      and e not in self._merited][:mfree]:
-                self._merited.add(e)
-                self.last_seen[e] = self.segments      # the prune clock
+            m = self._vote
         adm = self._admitted
         free = self.resident - len(adm)
         if free <= 0:
@@ -562,6 +593,39 @@ class PagedPool(nn.Module):
         new = [e for e in order if float(m[e]) > 0 and e not in adm][:free]
         if not new:
             return 0
+        return self._place(new)
+
+    def _draw(self, mass, draw):
+        """
+        Above temperature 0: this row's experts, drawn from the text.
+
+        `mass` is every expert's full router probability, summed over this
+        forward's characters at this row. It joins the text's tally for the
+        row - every character read since position 0 - and `draw` experts not
+        yet admitted are drawn from that tally without replacement, in
+        proportion to tally^(1/T), while the card has room. Any expert in the
+        pool can be drawn; the colder the temperature, the more the draws
+        favour what the text wants most.
+        """
+        r = self._row
+        self._row += 1
+        t = _tally(self._rows.get(r), mass.detach().float().cpu())
+        self._rows[r] = t
+        free = self.resident - len(self._admitted)
+        if free <= 0:
+            return []
+        u = torch.rand(t.shape).clamp_(1e-12, 1 - 1e-7)
+        keys = (torch.log(t.clamp_min(1e-30)) / self.select_temperature
+                - torch.log(-torch.log(u)))
+        keys[t <= 0] = -float("inf")
+        if self._admitted:
+            keys[torch.tensor(sorted(self._admitted))] = -float("inf")
+        k = min(int(draw), free, int(torch.isfinite(keys).sum()))
+        return torch.topk(keys, k).indices.tolist() if k > 0 else []
+
+    def _place(self, new):
+        """Put newly admitted experts on the card. Returns how many loaded."""
+        adm = self._admitted
         adm |= set(new)
         here = {e: s for s, e in enumerate(self.slots) if e >= 0}
         # a newcomer takes a slot holding nothing this forward admitted: an
@@ -585,8 +649,11 @@ class PagedPool(nn.Module):
             self.swaps += 1
         for e in new:
             self.ever[e] = True
-        if self._exploring:
-            self.recent[new] += 1.0 / self.explore_steps
+        # THE PRUNE CLOCK: whatever admits an expert resets it
+        self.last_seen[torch.tensor(new, device=self.last_seen.device)] = \
+            float(self.segments)
+        if self._trains:
+            self.recent[new] += 1.0 / self.usage_steps
         self.loads += loads
         self._mask = None
         return loads
@@ -845,7 +912,8 @@ class PagedPool(nn.Module):
         self.ever = torch.cat([self.ever, torch.zeros(k, dtype=torch.bool,
                                                       device=self.ever.device)])
         self.admits = grow_vec(self.admits, 0.0)
-        # a newborn has been used by nothing, so it starts with the whole bonus
+        # a newborn has been used by nothing, so the balance term pulls its row
+        # up from the first training forward after its birth
         self.recent = grow_vec(self.recent, 0.0)
 
         # the routers keep one row per expert, so they grow too - each new
@@ -970,7 +1038,8 @@ class PagedPool(nn.Module):
         self.slots = [remap.get(s, -1) for s in self.slots]
         # a vote is counted by position in the pool, which pruning renumbers;
         # a text in progress starts counting again from its next forward
-        self._vote = self._merit_vote = None
+        self._vote = None
+        self._rows = {}
         self._n = len(keep)
         return gone
 

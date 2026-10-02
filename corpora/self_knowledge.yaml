@@ -58,20 +58,22 @@
     whose choice did not make it uses the best of those that did. When I
     write, every character adds its vote to what the prompt and the reply so
     far have asked for, and routes among what the whole text wants. While I
-    train, an expert used less than its fair share gets a small bonus when I
-    choose, so experts I rarely use still get tried.
+    train, my router is charged for leaning on the experts I use most, so the
+    ones I rarely use get chosen too.
 
 - ask: [do you use all your experts, how do new experts get a chance,
-        what is exploration, why are some experts never used]
+        what is the balance term, why are some experts never used]
   say: >
-    While I train, every expert keeps a running share of the recent training
-    windows that used it. When a training window chooses, an expert used less
-    than its fair share gets a bonus on its score - {explore_bias:g} logits at
-    no use, fading as it is used - so experts I rarely use still get tried,
-    and a tried expert gets the same gradient as any chosen one. The bonus decides what is
-    chosen, never how much a chosen expert contributes, and when I measure
-    myself or write, I use my router's own choice. An expert that helps is
-    soon wanted without the bonus; one that never earns that is pruned.
+    Left alone my router keeps choosing the same experts, so while I train
+    every expert keeps a running share of the recent training windows that
+    admitted it, and my loss carries a small term - weight {balance:g} - that
+    charges my router for the probability it puts on each expert in
+    proportion to that share. Busy experts get dearer and idle ones cheaper,
+    so my router's own rows move toward the experts I rarely use. Because it
+    is the router itself that changes, I choose that way when I read and
+    write too, not only while I train. A text can still want just a few
+    experts; what gets evened out is use across texts. An expert nothing
+    admits for {survival_chars_m:.0f} million characters is pruned.
 
 - ask: [how does the router learn, what trains the router,
         how do you learn which experts to ask for]
@@ -196,8 +198,9 @@
     than from noise, because noise is novel and computes nothing worth routing
     to. Its router row is the average of its parents' rows, weighted by how
     many units each gave, so it scores every character with the same weighted
-    average of its parents' scores. Nothing has used it yet, so while I train
-    it gets the whole exploration bonus and is tried soon after it is born.
+    average of its parents' scores. Nothing has used it yet, so from the first
+    window I train on after its birth the balance term pulls its router row
+    up, until texts start admitting it.
     It cannot be pruned during its first {survival_chars_m:.0f} million
     characters.
 
@@ -422,8 +425,8 @@
         how do you protect against a bad new expert]
   say: >
     Two things. A new expert starts with a gate near zero, so it contributes
-    almost nothing however often it is chosen, and the bonus that gets it
-    tried while I train is small and fades as it is used. And its router row
+    almost nothing however often it is chosen, and the balance term only
+    moves my router toward it a little each training step. And its router row
     is the weighted average of its parents' rows, so at birth it never scores
     a character higher than its best parent does.
 
@@ -440,9 +443,9 @@
 
 - ask: [when do you delete an expert, what gets pruned, how does an expert die]
   say: >
-    When my router itself has not asked for it in {survival_chars_m:.0f}
-    million characters - a turn it got only through the exploration bonus does
-    not count. That is the only test. It is never touched inside its first
+    When nothing has admitted it in {survival_chars_m:.0f} million
+    characters: being used at all keeps it alive. That is the only test. It
+    is never touched inside its first
     {survival_chars_m:.0f} million, so one that is slow to start is not cut
     before it has had its chance, and an expert currently on the card is never
     pruned. Past {dying_at:.0%} of the way to that line it counts as dying, and

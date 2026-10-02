@@ -127,6 +127,8 @@ class Reader:
                                       pos_offset=offset)
         if aux_weight and getattr(self.model, "pool", None) is not None:
             loss = loss + aux_weight * self.model.pool_aux()
+        if hasattr(self.model, "pool_balance"):
+            loss = loss + self.model.pool_balance()
         self.seen += x.shape[1]
         if not learn:
             detach_caches(self.caches)
@@ -297,6 +299,8 @@ class FileReader:
             logits, loss = self.model(x, y, caches=None, pos_offset=0)
         if aux_weight and getattr(self.model, "pool", None) is not None:
             loss = loss + aux_weight * self.model.pool_aux()
+        if hasattr(self.model, "pool_balance"):
+            loss = loss + self.model.pool_balance()
         self.pos = end
         self.seen += n
         return loss
