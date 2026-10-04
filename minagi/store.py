@@ -412,7 +412,84 @@ def summarise(path):
     gates = [e["gate"] for e in man["experts"]]
     live = sum(1 for g in gates if abs(g) > 0.01)
     print(f"  {live} experts carrying weight, {len(gates)-live} gated to rest")
+    print()
+    for line in param_table(count_params(path)):
+        print("  " + line)
     return 0
+
+
+def count_params(path):
+    """
+    How many parameters the model on disk has, counted from its files.
+
+    The README's table is generated from this and the scaling chart reads its
+    sizes from it, so the three cannot disagree, and none of them can go stale
+    while the pool grows and prunes:
+
+        core         the trunk - embeddings, attention, norms, adapter,
+                     halting head - from core.npz
+        routers      one row per expert at each call site, its depth
+                     embedding, and the experts' gates, from routers.npz
+        experts      every expert in the manifest, at the size it was written
+        resident     the part that is ever on the card at once: the core, the
+                     routers and `pool_resident` experts
+        dense_equiv  what one byte costs to compute, in the 6ND sense: two
+                     prelude blocks, then attention, top_k of the resident
+                     experts and a ranking of the pool on each recurrent step,
+                     counted at train_steps_mean steps - the dense model that
+                     costs the same per byte, which is what the scaling chart
+                     is drawn against
+    """
+    with open(os.path.join(path, "manifest.json")) as f:
+        man = json.load(f)
+
+    def size(name):
+        with np.load(os.path.join(path, name)) as z:
+            return sum(int(np.prod(z[k].shape)) for k in z.files)
+    c = man.get("cfg", {})
+    d = int(c.get("d_model", man.get("d_model", 512)))
+    dff = int(c.get("d_ff", man.get("d_ff", 1408)))
+    pff = int(c.get("pool_d_ff", 2048))
+    depth = int(c.get("pool_depth", 1) or 1)
+    k = int(c.get("pool_top_k", 8))
+    steps = float(c.get("train_steps_mean", 12.8))
+    n = len(man["experts"])
+    experts = sum(int(e["params"]) for e in man["experts"])
+    per = experts // n if n else depth * 3 * d * pff
+    core, routers = size("core.npz"), size("routers.npz")
+    resident = int(c.get("pool_resident", 32))
+    with np.load(os.path.join(path, "core.npz")) as z:
+        vocab = int(z["tok_emb.weight"].shape[0]) if "tok_emb.weight" in z.files else 265
+    prelude = 4 * d * d + 3 * d * dff             # attention + feed-forward
+    dense = (2 * prelude + steps * (4 * d * d + k * per + n * d)
+             + d * 2 * d + vocab * d)
+    return {"step": man.get("step"), "n_experts": n, "per_expert": per,
+            "core": core, "routers": routers, "experts": experts,
+            "total": core + routers + experts, "resident": resident,
+            "resident_params": core + routers + min(resident, n) * per,
+            "dense_equiv": dense, "top_k": k, "steps": steps,
+            "max_steps": int(c.get("max_steps", 24)), "d_model": d,
+            "pool_d_ff": pff, "pool_depth": depth}
+
+
+def param_table(p):
+    """count_params as the table `python3 -m minagi.store` prints and the
+    README carries, decimal points aligned."""
+    def m(v):
+        s = f"{v / 1e6:.2f}" if v < 10e6 else f"{v / 1e6:.1f}"
+        i, f_ = s.split(".")
+        return f"{i:>4}.{f_}M".ljust(10)
+    shape = (f"{p['pool_depth']} x " if p["pool_depth"] > 1 else "") + \
+        f"3 x {p['d_model']} x {p['pool_d_ff']}"
+    return [line.rstrip() for line in (
+            f"core     {m(p['core'])}embeddings, attention, norms, adapter, "
+            f"halting head",
+            f"routers  {m(p['routers'])}one row per expert at each call site, "
+            f"depth embedding, gates",
+            f"experts  {m(p['experts'])}{p['n_experts']} x "
+            f"{p['per_expert'] / 1e6:.2f}M each  ({shape})",
+            "-" * 22,
+            f"total    {m(p['total'])}")]
 
 
 if __name__ == "__main__":
