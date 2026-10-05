@@ -276,7 +276,15 @@ class RecurCoder(nn.Module):
                     and n < n_steps - cfg.bptt_window):
                 h = h.detach()
             active = (~halted).squeeze(-1) if freeze and n else None
-            if active is not None and not bool(active.any()):
+            if active is not None:
+                # one read-back settles the row: nobody left, everybody, or
+                # some. Only "some" needs the mask below - everybody runs as
+                # if there were none, so a reply's character, which is
+                # everybody until it halts, costs no more waits than that
+                live = int(active.sum())
+                if live == active.numel():
+                    active = None
+            if active is not None and live == 0:
                 # every character has halted. What is left is what the
                 # characters after them will read at this pass.
                 if caches is not None:
@@ -333,12 +341,13 @@ class RecurCoder(nn.Module):
                 if halted_logits is None:
                     halted_logits = logits_n.clone()
                     steps_used = torch.ones(B, T, device=x.device)
+                # unconditionally: where() with nothing newly halted changes
+                # nothing, and asking first would make the host wait
                 newly = (~halted) & ((1.0 - cum) >= cfg.halt_thresh)
-                if bool(newly.any()):
-                    halted_logits = torch.where(newly, logits_n, halted_logits)
-                    steps_used = torch.where(
-                        newly.squeeze(-1),
-                        torch.full_like(steps_used, float(n + 1)), steps_used)
+                halted_logits = torch.where(newly, logits_n, halted_logits)
+                steps_used = torch.where(
+                    newly.squeeze(-1),
+                    torch.full_like(steps_used, float(n + 1)), steps_used)
                 halted = halted | newly
             if collect:
                 per_step.append({"step": n + 1,

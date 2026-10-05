@@ -303,7 +303,12 @@ class PagedPool(nn.Module):
         self.dying_at = 0.75
         # the experts the current forward has admitted - see admit()
         self._admitted = set()
+        # the slots' weights in the compute dtype, for forwards that compute
+        # no gradient - see inference_weights()
+        self._infer = None
         self._mask = None
+        # the slots as an index on a device - see _slot_rows()
+        self._slot_idx = ((), {})
         self.loads = 0            # experts brought onto the card, ever
         # HOW MUCH EACH EXPERT HAS BEEN USED LATELY: its share of recent
         # training forwards that admitted it, a running average over
@@ -423,25 +428,38 @@ class PagedPool(nn.Module):
         """One row per expert on disk; growth adds rows."""
         return self._n
 
+    def _slot_rows(self, device):
+        """
+        The expert each slot holds, as an index on `device`; an empty slot
+        reads row 0. Every row of every forward asks for it - for the
+        router's rows, the gates, the usage count - and on a GPU a tensor
+        built from a list is a copy the host stops and waits for, so it is
+        built again only when the slots change.
+        """
+        key = tuple(self.slots)
+        if self._slot_idx[0] != key:
+            self._slot_idx = (key, {})
+        got = self._slot_idx[1].get(device)
+        if got is None:
+            got = self._slot_idx[1][device] = torch.tensor(
+                [max(s, 0) for s in key], device=device)
+        return got
+
     def resident_rows(self):
         """Which router rows the resident experts own, in slot order."""
-        return torch.tensor([max(s, 0) for s in self.slots],
-                            device=self.gate.device)
+        return self._slot_rows(self.gate.device)
 
     def n_resident(self):
         return self.resident
 
     def routable_gate(self):
         """Gates of the resident experts, in slot order."""
-        idx = torch.tensor([max(s, 0) for s in self.slots],
-                           device=self.gate.device)
-        return self.gate[idx]
+        return self.gate[self._slot_rows(self.gate.device)]
 
     def note_use(self, hit):
         """Routing counts arrive per SLOT; usage is kept per EXPERT."""
-        idx = torch.tensor([max(s, 0) for s in self.slots],
-                           device=self.use.device)
-        self.use.index_add_(0, idx, hit.to(self.use.dtype))
+        self.use.index_add_(0, self._slot_rows(self.use.device),
+                            hit.to(self.use.dtype))
         self.age += 1
 
     def n_params(self):
@@ -512,9 +530,11 @@ class PagedPool(nn.Module):
         self._admitted = set()
         self._voted = False
         self._row = 0
-        self._mask = None
         self._balance = None
         self._trains = bool(explore)
+        if self._trains:
+            # a forward that trains holds exactly the memory it always did
+            self._infer = None
         if self._trains:
             self.recent[:self._n] *= 1.0 - 1.0 / self.usage_steps
 
@@ -589,8 +609,9 @@ class PagedPool(nn.Module):
         free = self.resident - len(adm)
         if free <= 0:
             return 0
-        order = torch.argsort(m, descending=True).tolist()
-        new = [e for e in order if float(m[e]) > 0 and e not in adm][:free]
+        order = torch.argsort(m, descending=True)
+        asked = (m[order] > 0).tolist()
+        new = [e for e, a in zip(order.tolist(), asked) if a and e not in adm][:free]
         if not new:
             return 0
         return self._place(new)
@@ -633,9 +654,11 @@ class PagedPool(nn.Module):
         # the least recently used, which is the one least likely to be wanted
         # back
         victims = [s for s, e in enumerate(self.slots) if e < 0 or e not in adm]
-        victims.sort(key=lambda s: (self.slots[s] >= 0,
-                                    float(self.last_seen[self.slots[s]])
-                                    if self.slots[s] >= 0 else -1.0))
+        if victims:
+            seen = self.last_seen.tolist()       # one read-back, not one per slot
+            victims.sort(key=lambda s: (self.slots[s] >= 0,
+                                        seen[self.slots[s]]
+                                        if self.slots[s] >= 0 else -1.0))
         plan = list(self.slots)
         for e in new:
             if e not in here:
@@ -655,15 +678,42 @@ class PagedPool(nn.Module):
         if self._trains:
             self.recent[new] += 1.0 / self.usage_steps
         self.loads += loads
-        self._mask = None
         return loads
 
+    def inference_weights(self, dtype):
+        """
+        Every slot's weights in `dtype`, for a forward that computes no
+        gradient: a character being written, a held-out chunk.
+
+        The batched dispatch casts the slots' fp32 weights to the compute dtype
+        inside every expert call - all 32 slots, at every row, about 600 MB of
+        memory traffic a row on a GPU, 24 rows a character - although nothing
+        about them changes while a reply is written. Cast once here instead,
+        and kept until something does change: an optimiser step (counted by
+        the step hook, and advancing the version counters), a load into a slot
+        (which drops the copy, since loads write through .data), or the start
+        of a forward that trains (which drops it, so training's memory is what
+        it always was). The key checks all of them, so a stale copy cannot be
+        served even if a path that changes a slot forgets to say so.
+        """
+        key = (dtype, self.w1._version, self.w3._version, self.w2._version,
+               self._stepped, self.swaps, tuple(self.slots),
+               self.w1.data_ptr())
+        if self._infer is None or self._infer[0] != key:
+            self._infer = (key, tuple(t.detach().to(dtype)
+                                      for t in (self.w1, self.w3, self.w2)))
+        return self._infer[1]
+
     def admitted_mask(self):
-        """Which slots hold an expert this forward admitted, in slot order."""
-        if self._mask is None:
-            self._mask = torch.tensor([e in self._admitted for e in self.slots],
-                                      device=self.gate.device)
-        return self._mask
+        """Which slots hold an expert this forward admitted, in slot order.
+        Built again only when the slots or the admitted set change: the
+        characters of a reply are admitted the same experts one after
+        another, and each build is a copy the host waits for."""
+        key = (tuple(self.slots), frozenset(self._admitted))
+        if self._mask is None or self._mask[0] != key:
+            self._mask = (key, torch.tensor([e in self._admitted for e in self.slots],
+                                            device=self.gate.device))
+        return self._mask[1]
 
     @torch.no_grad()
     def _rearrange(self, plan, here):
@@ -709,6 +759,9 @@ class PagedPool(nn.Module):
             if e >= 0 and old[s] != e:
                 self._loaded_at[s] = now
         self.slots = list(plan)
+        # Loads write through .data, which does not advance the slots'
+        # version counters - so the cast copy is dropped here explicitly
+        self._infer = None
 
     def _entry(self, s, e, st):
         """

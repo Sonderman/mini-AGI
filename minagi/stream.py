@@ -45,15 +45,6 @@ def detach_caches(caches):
     return caches
 
 
-def trim_caches(caches, keep):
-    """Drop the oldest positions once the cache is longer than the context."""
-    for c in caches:
-        if c["k"] is not None and c["k"].shape[-2] > keep:
-            c["k"] = c["k"][..., -keep:, :].contiguous()
-            c["v"] = c["v"][..., -keep:, :].contiguous()
-    return caches
-
-
 class Reader:
     """
     A cursor into one character stream, with its own cache.

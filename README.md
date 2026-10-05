@@ -20,134 +20,118 @@ The "final" weights are **not published yet**. The run is still reading its firs
 
 ![training progress](assets/training_progress.png)
 
-*Every sample round of the run to date: 1,180.9M characters over 1,835 evaluations.*
+*Every sample round of the run to date: 1,265.6M characters over 1,926 evaluations.*
 
 </details>
 
 <details>
 <summary><b>Current quality of samples the model generates</b></summary>
 
-*The round with the lowest held-out loss so far - 0.6456 nats at 1,180.9M characters. Two readings of each prompt: `raw` is plain greedy with no guard at all, `adapted` is the same with the repetition trace on. The whole history is in [runs/samples.txt](runs/samples.txt).*
+*The round with the lowest held-out loss so far - 0.6358 nats at 1,184.6M characters. Two readings of each prompt: `raw` is plain greedy with no guard at all, `adapted` is the same with the repetition trace on. The whole history is in [runs/samples.txt](runs/samples.txt).*
 
 ```
 ==============================================================================
-step 576,982   1180.9M of 7,880M characters (14.99%)   1719 min   218 experts
-context 4,096 characters of 4,096   reading 1,481 char/s   writing 16.9 char/s   still gaining +0.0039 deep into it
-grad norm 1.31 against a clip of 1   clipping
-train loss 0.5299   lr 2.20e-05   evidence t +2.87 over 65.7 (effect +0.0638)   rate x0.074
-held-out loss 0.6456 +/-0.0288 nats   0.9314 bits/char   perplexity 1.91   gap +0.1157
-  arithmetic 0.620   chat 0.622   chat_hermes 0.903   chess 0.423   code 0.543   reasoning 0.555   stories 0.433   wikipedia 1.066
-repeats 19% of 8-grams, greedy with no guard
+step 578,777   1184.6M of 7,880M characters (15.03%)   1777 min   220 experts
+context 4,096 characters of 4,096   writing 18.5 char/s   still gaining +0.0034 deep into it
+grad norm 1.56 against a clip of 1   clipping
+train loss 0.5584   lr 2.24e-05
+held-out loss 0.6358 +/-0.0136 nats   0.9172 bits/char   perplexity 1.89   gap +0.0774
+  arithmetic 0.612   chat 0.571   chat_hermes 0.832   chess 0.425   code 0.551   reasoning 0.551   stories 0.513   wikipedia 1.031
+repeats 15% of 8-grams, greedy with no guard
 ==============================================================================
 
 --- stories ---
 prompt: 'Once upon a time, there was a little boy named Tom. One day he '
-[raw]  repeated 8-grams 4%
-went to the park with his mom and dad. Tom was very excited to play on the swings. He was so excited to see the birds and the flowers. 
+[raw]  repeated 8-grams 22%
+went to the park with his mom and dad. Tom was very excited to play with his friends. He was so excited to play with his friends and have fu
+[adapted]  repeated 8-grams 1%
+was playing with his friends when they saw another boy. They wanted to play with him, but Tom didn't want to.
 
-Whe
-[adapted]  repeated 8-grams 25%
-was playing with his friends when they saw another boy. They wanted to play, but Tom's friends wanted to play.
-
-Tom's friends wanted to play
+Tom said, "No, I'm not welcom
 
 --- code ---
 prompt: 'def merge_sorted(a, b):\n    '
-[raw]  repeated 8-grams 17%
-"""
-    Return the sorted array of the sorted array.
+[raw]  repeated 8-grams 20%
+    """
+        Return the sorted sorted sorted array for the sorted array.
 
-    Parameters
-    ----------
-    a : array_like
-        The array of sorted array.
+        Parameters
+        ----------
+        a : array_like
   
-[adapted]  repeated 8-grams 22%
+[adapted]  repeated 8-grams 31%
 """
-    Returns allowed sorted arrays.
+    Returns another sorted array of sorted arrays.
     """
-
-    if not_has_bytes(a):
-    """
-    Returns:
-    (bytes, optional):
-    """
-    Returns:
-  
+    if(a.shape[0] == b.shape[1]):
+      """
+    Returns another sorted array 
 
 --- arithmetic ---
 prompt: 'add 4917 + 388 = '
-[raw]  repeated 8-grams 49%
+[raw]  repeated 8-grams 40%
 <think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 4+0+1=5c0 </think> 5305
-add 4 + 4 = 8
-add 4 + 4 = 8
-add 4 + 4 = 8
-add 4 + 4 = 8
-add 4 + 4 = 8
-add 4 + 4 = 8
-add 4 +
-[adapted]  repeated 8-grams 4%
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 0 = 1
+add 1 + 0 = 1
+add 1 + 0 = 1
+add 1 +
+[adapted]  repeated 8-grams 5%
 <think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 4+0+1=5c0 </think> 5305
-add 786429 + 130578 = <think> 9+8+0=7c1 2+7+1=0c1 4+5+1=0c1 6+0+1=7c0 8+3+0=1c1 7+1+1=9c0 </think> 91700
+add 786924 + 130578 = <think> 4+8+0=2c1 2+7+1=0c1 9+5+1=5c1 6+0+1=7c0 8+3+0=1c1 7+1+1=9c0 </think> 91750
 
 --- chat ---
 prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
-[raw]  repeated 8-grams 10%
-It's 1. The expert files and the two optimiser moments that belong to each, it sits in system memory. The expert files matter: an expert mov
-[adapted]  repeated 8-grams 12%
-It's 1.5 million, 1.5 million, and 1.5 million in 1.5 million, so there is nothing more than once.
+[raw]  repeated 8-grams 0%
+It is 1. I read one stream, one pha9 files has one. In a town file per character, which is thinking that never beco1.
 </bot>
 <user>
-what is the last term -
-</user>
-<bot>
-A small t
+what is the recurr
+[adapted]  repeated 8-grams 44%
+In three places, and one mark, and one mark, and one mark, and one mark, and one marks, and one marks mixed in state. It cannot be pruned du
 
 --- chat_hermes ---
 prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
-[raw]  repeated 8-grams 65%
+[raw]  repeated 8-grams 13%
 The train travels 60 km in 45 minutes in 45 minutes.
-The train travels 60 km in 45 minutes in 45 minutes.
-The train travels 60 km in 45 minu
-[adapted]  repeated 8-grams 27%
-To find the speed of train's travel travel, we'll need to calculate the speed of train's travel travel.
-
-Speed = Train's travel
-Speed = 45 k
+</bot>
+<user>
+What is the speed of the train traveled in the form of a complete product of the tr
+[adapted]  repeated 8-grams 22%
+To find out how much speed it can be, we'll first consider the speed of the train.
+The speed of the train is:
+Speed of the train
+Speed of th
 
 --- reasoning ---
 prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
-[raw]  repeated 8-grams 0%
-Okay, let's tackle this problem. So, the question is asking what is the largest number in a list. The options are A, B, C, D, E, F, and the 
-[adapted]  repeated 8-grams 2%
-Okay, let's tackle this problem. So, we're given a list. There's another list. The largest number is already in all.
-
-The function should re
+[raw]  repeated 8-grams 18%
+Okay, let's tackle this problem. So, the question is about a list of numbers in a list. The largest number is a list of numbers in a list. T
+[adapted]  repeated 8-grams 14%
+Okay, let's tackle this problem. So, we're given a list. There's another list. There's another01 number in another9. The largest number is 1
 
 --- wikipedia ---
 prompt: '== History ==\nThe [[Roman Empire]] was '
-[raw]  repeated 8-grams 26%
-founde10 years old and had a high prize for the [[Roman Empire]]. The [[Roman Empire]] was founded in [[1990]] and had a high prize for the 
-[adapted]  repeated 8-grams 47%
-founde10,502 km&amp;sup264 (1,089).
-*[http://2004.15 km&amp;sup2;]
-*[http://2004.15 km&amp;sup2;]
-*[http://2004.15 k.us]
-*[http://2004.15 k.
+[raw]  repeated 8-grams 22%
+founde10 mostly 2011 mostly in the [[British Republic of Europe]] and is a modern [[political community]] in the [[British Republic of Europ
+[adapted]  repeated 8-grams 28%
+founde10,528 km/20, and then soldiers washed for the [[...]] and then soldiers washed for the [[Roman Empire]]. They washed for their family
 
 --- chess ---
 prompt: '<g>1700 1-0 1. e4 e5 2. '
-[raw]  repeated 8-grams 0%   16 legal moves, then Be1
-d3 d6 3. Nc3 Nc6 4. Nf3 Nge7 5. Be2 Ng6 6. O-O Be7 7. h3 O-O 8. Nh2 f5 9. f3 f4 10. Be1 Be6 11. Bg4 Bxg4 12. fxg4 Nd4 13. Nd5 Nxe2+ 14. Qxe2
-[adapted]  repeated 8-grams 0%   25 legal moves, then Nx
-d3 Nc6 3. Nf3 d6 4. Be2 Nge7 5. O-O f5 6. Nc3 f4 7. Bd2 Ng6 8. Qe1 Be7 9. h3 O-O 10. Nh2 Be6 11. f3 Qd7 12. Ng4 Bxg4 13. fxg4 Nd4 14. Be3 Nx
+[raw]  repeated 8-grams 0%   13 legal moves, then Bd7
+f4 d6 3. Nf3 Bg4 4. Be2 Nc6 5. O-O Nf6 6. Nc3 Be7 7. d3 O-O 8. f5 Bd7 9. h3 Be8 10. Be3 Nd7 11. Qd2 Nf6 12. Nh2 Nh5 13. Bg5 f6 14. Be3 Nf7 1
+[adapted]  repeated 8-grams 2%   25 legal moves, then Nd7
+d3 Nc6 3. Be3 d6 4. Nc3 Be6 5. Nf3 h6 6. Be2 Nf6 7. O-O Be7 8. h3 O-O 9. a3 Nd7 10. b4 f5 11. exf5 Bxf5 12. Nh4 Be6 13. Nf5 Bxf5 14. Bg4 Nd7
 
 --- self-knowledge ---
 prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
 [raw]  repeated 8-grams 2%
-It holds the 96 experts to the card the 32, and that is deliberate. Some of my busiest experts hold the smallest gates - they are chosen con
-[adapted]  repeated 8-grams 0%
-It holds the 96 experts I touched most recently, as tensors ready to copy. An expert leaving the card goes there first, not to disk, so want
+Adam with decoupled weight decay. The rate follows no schedule at all, because a schedule needs an end to anneal toward and I do not have on
+[adapted]  repeated 8-grams 2%
+Adam with decoupled weight decay. The rate follows no schedule at all, because a schedule needs an end to anneal toward and I do not have on
 ```
 
 </details>
@@ -382,25 +366,25 @@ The numbers below are for tracking purposes and move as the run continues. Held-
 There is a second variance underneath these figures. The same configuration run twice lands about 0.014 apart, because the expert dispatch is not deterministic on CUDA. **Treat about 0.03 as the threshold for a real difference**, not the error bar printed beside one score.
 
 <!-- auto:benchmarks -->
-**Where the model is** (1,180.9M characters read, 218 experts):
+**Where the model is** (1,265.6M characters read, 260 experts):
 
 | | nats/char | bits/byte |
 |---|---|---|
-| **held-out, all 8 subjects** | **0.6456** ± 0.0288 | **0.9314** |
-| train | 0.5299 | 0.7645 |
+| **held-out, all 8 subjects** | **0.6420** ± 0.0289 | **0.9262** |
+| train | 0.5272 | 0.7606 |
 
 **Held-out loss per subject:**
 
 | Subject | nats/char | bits/byte |
 |---|---|---|
-| `chess` | 0.423 | 0.610 |
-| `stories` | 0.433 | 0.625 |
-| `code` | 0.543 | 0.783 |
-| `reasoning` | 0.555 | 0.801 |
-| `arithmetic` | 0.620 | 0.894 |
-| `chat` | 0.622 | 0.897 |
-| `chat_hermes` | 0.903 | 1.303 |
-| `wikipedia` | 1.066 | 1.538 |
+| `chess` | 0.414 | 0.597 |
+| `stories` | 0.427 | 0.616 |
+| `code` | 0.537 | 0.775 |
+| `reasoning` | 0.552 | 0.796 |
+| `arithmetic` | 0.618 | 0.892 |
+| `chat` | 0.621 | 0.896 |
+| `chat_hermes` | 0.904 | 1.304 |
+| `wikipedia` | 1.063 | 1.534 |
 <!-- /auto:benchmarks -->
 
 ### Data Scaling
@@ -410,17 +394,16 @@ There is a second variance underneath these figures. The same configuration run 
 
 Every point on this chart is a **bits-per-byte on the PG19 test split** - one held-out set, so the comparison is direct. This model scores **2.091 BPB** over the whole split (100 books, 41,289,001 bytes) at a context of 4,096, against its own mixture's 0.94. PG19 is out of distribution for it: it was trained on a corpus assembled for this project and has read no Victorian novels, so much of that gap is subject matter rather than capability.
 
-**The results so far are promising.** The red line is the fitted power law on this model's own held-out, `L ∝ D^-0.235` with R² 0.98 over every point past the warmup - between Kaplan's 0.095 and Chinchilla's 0.28, and it has held for more than a decade of data. How steep it looks depends on where the fit starts, and the band on the chart spans that range rather than pretending to one number.
+**The results so far are promising.** The red line is the fitted power law on this model's own held-out, `L ∝ D^-0.232` with R² 0.98 over every point past the warmup - between Kaplan's 0.095 and Chinchilla's 0.28, and it has held for more than a decade of data. How steep it looks depends on where the fit starts, and the band on the chart spans that range rather than pretending to one number.
 
-Read straight off that trend, on this model's own mixture. It has read 1.18B characters so far, in about 14 days of running. The days below assume the pace of the last 29 hours of it: 1,197 characters a second on the wall clock, held-out checks and rounds of samples included, because the reading waits for them.
+Read straight off that trend, on this model's own mixture. It has read 1.27B characters so far, in about 15 days of running. The days below assume the pace of the last 19 hours of it: 1,181 characters a second on the wall clock, held-out checks and rounds of samples included, because the reading waits for them.
 
-| held-out | total data read | further reading | days from here at ~1,197 char/s |
+| held-out | total data read | further reading | days from here at ~1,181 char/s |
 |---|---|---|---|
-| 0.93 BPB | 1.19B | +0.01B | 2 hours |
-| 0.80 BPB | 2.25B | +1.07B | ~10 |
-| **0.60 BPB** | 7.88B | +6.70B | **~65** |
+| 0.80 BPB | 2.38B | +1.11B | ~11 |
+| **0.61 BPB** | 7.88B | +6.61B | **~65** |
 
-The first two are hours to days of reading on one laptop GPU, and every one of them sits inside a single pass of the 7.88B-character corpus.
+The first one is days of reading on one laptop GPU, and it sits inside a single pass of the 7.88B-character corpus.
 
 The right panel shows which subjects are still moving. reasoning, code, stories, chat are the steep ones; arithmetic and wikipedia have the shallowest slopes, which is the honest counterweight - the expensive domains are not the fastest ones.
 <!-- /auto:scaling -->
@@ -544,17 +527,17 @@ Byte level - vocabulary 265: the 256 byte values plus 9 structural markers (`<th
 | paging | 32 experts resident on the card; the rest live on disk |
 
 <!-- auto:params -->
-The parameter count moves, because the pool grows and prunes itself while training. `python3 -m minagi.store weights` prints what it is now. At step 577,407:
+The parameter count moves, because the pool grows and prunes itself while training. `python3 -m minagi.store weights` prints what it is now. At step 618,315:
 
 ```
 core        8.27M  embeddings, attention, norms, adapter, halting head
-routers     0.11M  one row per expert at each call site, depth embedding, gates
-experts   688.9M   219 x 3.15M each  (3 x 512 x 2048)
+routers     0.13M  one row per expert at each call site, depth embedding, gates
+experts   817.9M   260 x 3.15M each  (3 x 512 x 2048)
 ----------------------
-total     697.3M
+total     826.3M
 ```
 
-**VRAM is set by the card's 32 slots, not by the pool.** Only 32 experts are resident at a time - about 109M parameters of the 697M - which is why the pool can keep growing on an 8 GB card. Per byte the model activates about **344M** parameters - two prelude blocks, then attention and top-8 of the resident experts on each recurrent step, counted at the 12.8 steps training samples its depth around (a character may take up to 24) - so by the 6ND rule it costs the same per byte as a dense 344M byte-level transformer, not a 697M one. That is the figure the scaling chart in Benchmarks is drawn against.
+**VRAM is set by the card's 32 slots, not by the pool.** Only 32 experts are resident at a time - about 109M parameters of the 826M - which is why the pool can keep growing on an 8 GB card. Per byte the model activates about **344M** parameters - two prelude blocks, then attention and top-8 of the resident experts on each recurrent step, counted at the 12.8 steps training samples its depth around (a character may take up to 24) - so by the 6ND rule it costs the same per byte as a dense 344M byte-level transformer, not a 826M one. That is the figure the scaling chart in Benchmarks is drawn against.
 <!-- /auto:params -->
 
 ## AI usage

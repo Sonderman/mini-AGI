@@ -141,8 +141,9 @@ def load(weights, device=None, learn=True, lr=3e-4, save_every=8,
     # first question instead of nothing. It is one forward over the priming
     # text, which admits the experts that text asks for, as any forward does.
     if PRIME:
+        from minagi.precision import amp
         ids = STATE["tok"].encode(PRIME).ids[-model.cfg.block:]
-        with torch.no_grad():
+        with torch.no_grad(), amp(dev):
             model(torch.tensor([ids], device=dev))
 
     if learn:
@@ -239,31 +240,16 @@ def build_prompt(messages, budget, prime=""):
 def stream(prompt, max_new):
     from minagi.config import get as _g, load as _lc
     from minagi.decode import pick_next
-    from minagi.stream import trim_caches
+    from minagi.precision import amp
 
     c = _lc()
     strength = _g(c, "decoding.adapt_strength", 2.5)
     decay = _g(c, "decoding.adapt_decay", 0.88)
 
-    def where(caches):
-        """
-        The position the next character sits at: however much history the
-        cache still holds after trimming.
-
-        NOT a running count. Rotary tables are built for positions 0 to
-        block-1, so a counter that saturates at `block` asks for position
-        `block` on the very next character and the model refuses. Reading it
-        back off the cache cannot drift, because the cache is the thing the
-        positions have to agree with.
-        """
-        for c in caches:
-            if c.get("k") is not None:
-                return c["k"].shape[-2]
-        return 0
-
     model, tok = STATE["model"], STATE["tok"]
     device = next(model.parameters()).device
-    ids = tok.encode(prompt).ids[-model.cfg.block:]
+    block = model.cfg.block
+    ids = tok.encode(prompt).ids[-block:]
     out = torch.tensor([ids or [10]], device=device)
 
     # THE TEXT CHOOSES. The prompt is read in chunks, and each chunk adds its
@@ -273,18 +259,29 @@ def stream(prompt, max_new):
     # loading whatever is not already on the card. Nothing here chooses
     # experts - the forward does.
     pool = getattr(model, "pool", None)
-    caches = model.empty_caches()
 
     # Prefill in chunks, the way training reads a corpus. Feeding a long
     # prompt in one pass materialises activations for every position across
     # every block application at once, which is what puts a long context out
-    # of reach; the cache carries the reach instead.
+    # of reach; the cache carries the reach instead. Every forward computes
+    # in the process-wide precision, as reading and model.generate do.
     CHUNK = 512
-    logits = None
-    for i in range(0, out.shape[1], CHUNK):
-        part = out[:, i:i + CHUNK]
-        trim_caches(caches, model.cfg.block - part.shape[1])
-        logits = model(part, caches=caches, pos_offset=where(caches))[0]
+    caches = None
+
+    def read(text):
+        """`text` into fresh caches from position 0, a chunk at a time; the
+        last chunk's logits. Position 0 begins a new text, so the vote that
+        admits experts is cast by what is read here and nothing before it."""
+        nonlocal caches
+        caches = model.empty_caches()
+        lg = None
+        for i in range(0, text.shape[1], CHUNK):
+            with amp(device):
+                lg = model(text[:, i:i + CHUNK], caches=caches, pos_offset=i)[0]
+        return lg
+
+    logits = read(out)
+    pos = out.shape[1]                       # where the next character sits
 
     cur = out[:, -1:]
     produced = []
@@ -294,8 +291,21 @@ def stream(prompt, max_new):
     for i in range(max_new):
         loads = getattr(pool, "loads", 0)
         if logits is None:
-            trim_caches(caches, model.cfg.block - cur.shape[1])
-            logits = model(cur, caches=caches, pos_offset=where(caches))[0]
+            if pos + cur.shape[1] > block:
+                # THE WINDOW IS FULL. A cached key keeps the rotary position
+                # it was read at, so dropping the oldest key and placing the
+                # next character at the end again - block-1, every time -
+                # gives the newest characters one position between them, and
+                # attention loses their order. Re-read the newest half of the
+                # text from position 0 instead: what model.generate does, and
+                # what every window of training is, a text from position 0.
+                ctx = out[:, -(block // 2):]
+                logits = read(ctx)
+                pos = ctx.shape[1]
+            else:
+                with amp(device):
+                    logits = model(cur, caches=caches, pos_offset=pos)[0]
+                pos += cur.shape[1]
             moved = getattr(pool, "loads", 0) - loads
             if moved:
                 # this character asked for experts that were not on the card;
@@ -833,9 +843,11 @@ def main():
     ap.add_argument("--save-every", type=int, default=8,
                     help="optimiser steps between writing the weights out")
     ap.add_argument("--precision", default=None,
-                    choices=["bf16", "fp16", "fp32"],
+                    choices=["bf16", "fp32"],
                     help="what the forward computes in; defaults to whatever "
-                         "config.yaml trains with")
+                         "config.yaml trains with. No fp16: the recurrent "
+                         "state reaches ~10,000 and RMSNorm squares it, past "
+                         "fp16's 65,504")
     args = ap.parse_args()
 
     from minagi.config import get as _g, load as _lc

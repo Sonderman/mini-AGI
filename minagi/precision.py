@@ -65,13 +65,58 @@ def compute_dtype():
     return _COMPUTE["dtype"]
 
 
+def cpu_bf16_native():
+    """
+    Whether this CPU multiplies bfloat16 in hardware: AVX-512 BF16 (AMD Zen 4
+    and later, recent Intel) or Intel AMX. Without it bf16 on the CPU is
+    emulated and slower than fp32, so the CPU stays in fp32 there.
+    MINAGI_CPU_BF16=1 or =0 overrides the detection, for testing.
+    """
+    import os
+    force = os.environ.get("MINAGI_CPU_BF16")
+    if force is not None:
+        return force.strip().lower() not in ("0", "", "false", "no", "off")
+    for name in ("_is_avx512_bf16_supported", "_is_amx_tile_supported"):
+        f = getattr(torch.cpu, name, None)
+        try:
+            if f is not None and f():
+                return True
+        except Exception:                                  # noqa: BLE001
+            pass
+    return False
+
+
+def _device_type(device):
+    return "cuda" if device is None else (
+        device.type if hasattr(device, "type") else str(device).split(":")[0])
+
+
+def autocast_on(device=None):
+    """
+    Whether forwards on `device` compute in the configured dtype. On a GPU
+    whenever that dtype is not fp32. On the CPU only for bfloat16 and only
+    where the CPU has it natively: there it is the GPU path's own precision at
+    about twice fp32's arithmetic rate, and everywhere else it would be slower.
+    """
+    dt = _COMPUTE["dtype"]
+    dev = _device_type(device)
+    if dt is torch.float32:
+        return False
+    if dev == "cuda":
+        return True
+    return dev == "cpu" and dt is torch.bfloat16 and cpu_bf16_native()
+
+
+def dispatch_dtype(device, fallback):
+    """The dtype the expert dispatch computes in: the configured one wherever
+    autocast is on, `fallback` - the residual stream's - where it is off."""
+    return _COMPUTE["dtype"] if autocast_on(device) else fallback
+
+
 def amp(device=None):
     """The autocast region every forward runs inside."""
-    dt = _COMPUTE["dtype"]
-    dev = "cuda" if device is None else (
-        device.type if hasattr(device, "type") else str(device).split(":")[0])
-    return torch.autocast(dev, dtype=dt,
-                          enabled=(dt is not torch.float32 and dev == "cuda"))
+    dev = _device_type(device)
+    return torch.autocast(dev, dtype=_COMPUTE["dtype"], enabled=autocast_on(dev))
 
 
 # -- storing moments in half the space ------------------------------------
