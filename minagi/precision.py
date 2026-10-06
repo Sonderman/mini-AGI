@@ -42,6 +42,8 @@ mantissa force themselves back to fp32 on the spot: the halting accumulator,
 the cross-entropy, the router logits and RMSNorm.
 """
 
+import os
+
 import torch
 
 _COMPUTE = {"dtype": torch.float32}
@@ -72,7 +74,6 @@ def cpu_bf16_native():
     emulated and slower than fp32, so the CPU stays in fp32 there.
     MINAGI_CPU_BF16=1 or =0 overrides the detection, for testing.
     """
-    import os
     force = os.environ.get("MINAGI_CPU_BF16")
     if force is not None:
         return force.strip().lower() not in ("0", "", "false", "no", "off")
@@ -91,20 +92,109 @@ def _device_type(device):
         device.type if hasattr(device, "type") else str(device).split(":")[0])
 
 
+# -- GPUs without bf16 arithmetic -----------------------------------------
+#
+# PyTorch runs bf16 on every GPU, converting where the hardware has no bf16
+# arithmetic, and conversion is not cheap: on an RX 6800 XT (RDNA2, gfx1030)
+# bf16 matmuls ran at 9 TFLOP/s against fp32's 15, and a whole learning step
+# took 3.6x as long - 336 characters a second read against 1,242. Such a GPU
+# computes in fp32 when it has the memory for it. fp32 holds its activations
+# at twice the size - a 4,096-character reading step peaked at 13.2 GB there,
+# against 7.6 in bf16 - so a smaller card keeps bf16: slower, but it fits.
+
+FP32_MIN_GIB = 14
+_GPU_INFO = {}
+
+
+def _gpu_info(device=None):
+    """(properties, is it AMD) for the GPU `device` names; None without one."""
+    try:
+        idx = getattr(device, "index", None)
+        if idx is None:
+            idx = torch.cuda.current_device()
+    except Exception:                                      # noqa: BLE001
+        return None
+    if idx not in _GPU_INFO:
+        try:
+            _GPU_INFO[idx] = (torch.cuda.get_device_properties(idx),
+                              bool(torch.version.hip))
+        except Exception:                                  # noqa: BLE001
+            _GPU_INFO[idx] = None
+    return _GPU_INFO[idx]
+
+
+def _gpu_arch(info):
+    props, amd = info
+    return ((getattr(props, "gcnArchName", "") or "").split(":")[0] if amd
+            else f"sm_{props.major}{props.minor}")
+
+
+def gpu_bf16_native(device=None):
+    """
+    Whether this GPU multiplies bfloat16 in hardware: NVIDIA from Ampere
+    (compute capability 8) on, AMD from RDNA3 (gfx11, gfx12) and the CDNA
+    accelerators (gfx908, gfx90a, gfx94x, gfx95x). Not RDNA1 or 2, not Vega,
+    not NVIDIA before Ampere. MINAGI_GPU_BF16=1 or =0 overrides the detection.
+    """
+    force = os.environ.get("MINAGI_GPU_BF16")
+    if force is not None:
+        return force.strip().lower() not in ("0", "", "false", "no", "off")
+    info = _gpu_info(device)
+    if info is None:
+        return True                  # nothing to ask: the rule as it always was
+    if info[1]:
+        arch = _gpu_arch(info)
+        return (arch.startswith(("gfx11", "gfx12", "gfx94", "gfx95"))
+                or arch in ("gfx908", "gfx90a"))
+    return info[0].major >= 8
+
+
+def gpu_fp32_instead(device=None):
+    """bf16 configured, on a GPU without bf16 arithmetic and with the memory
+    for fp32 (FP32_MIN_GIB): that GPU computes in fp32."""
+    if _COMPUTE["dtype"] is not torch.bfloat16 or gpu_bf16_native(device):
+        return False
+    info = _gpu_info(device)
+    return info is not None and info[0].total_memory >= FP32_MIN_GIB * 2**30
+
+
 def autocast_on(device=None):
     """
     Whether forwards on `device` compute in the configured dtype. On a GPU
-    whenever that dtype is not fp32. On the CPU only for bfloat16 and only
-    where the CPU has it natively: there it is the GPU path's own precision at
-    about twice fp32's arithmetic rate, and everywhere else it would be slower.
+    whenever that dtype is not fp32, unless it is bf16 and the GPU has no bf16
+    arithmetic but has the memory for fp32 (gpu_fp32_instead). On the CPU only
+    for bfloat16 and only where the CPU has it natively: there it is the GPU
+    path's own precision at about twice fp32's arithmetic rate, and everywhere
+    else it would be slower.
     """
     dt = _COMPUTE["dtype"]
     dev = _device_type(device)
     if dt is torch.float32:
         return False
     if dev == "cuda":
-        return True
+        return not gpu_fp32_instead(device)
     return dev == "cpu" and dt is torch.bfloat16 and cpu_bf16_native()
+
+
+def describe(device=None):
+    """What forwards on `device` compute in, and why when it is not what was
+    configured - for the line a run starts with."""
+    dt = _COMPUTE["dtype"]
+    name = {torch.float32: "fp32", torch.bfloat16: "bf16",
+            torch.float16: "fp16"}.get(dt, str(dt))
+    dev = _device_type(device)
+    info = _gpu_info(device) if dev == "cuda" else None
+    gpu = f"this GPU ({_gpu_arch(info)})" if info else "this GPU"
+    if autocast_on(device):
+        if dev == "cuda" and dt is torch.bfloat16 and not gpu_bf16_native(device):
+            return (f"bf16, which {gpu} converts rather than computes - fp32 is "
+                    f"faster on it but needs a {FP32_MIN_GIB} GB card")
+        return name
+    if dt is torch.float32:
+        return "fp32"
+    if dev == "cuda":
+        return f"fp32 - {gpu} has no {name} arithmetic, and fp32 is faster on it"
+    return f"fp32 - this CPU has no {name} arithmetic"
 
 
 def dispatch_dtype(device, fallback):

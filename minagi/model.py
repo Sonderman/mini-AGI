@@ -146,12 +146,16 @@ def _probe_fused(device, dtype, masked, sdpa=None):
     present and wrong - the mask aligned to the wrong corner, a broken
     backward - disagrees by far more than rounding does (under 1% in bf16).
     """
+    import warnings
     from torch.nn.attention import SDPBackend, sdpa_kernel
     sdpa = sdpa or F.scaled_dot_product_attention
     P, T = (96, 160) if masked else (0, 256)
     try:
-        with torch.inference_mode(False), torch.enable_grad(), \
-                torch.autocast(device.type, enabled=False):
+        # PyTorch explains every backend it skips, a warning each; the one
+        # line fused_attention_available prints says what matters
+        with warnings.catch_warnings(), torch.inference_mode(False), \
+                torch.enable_grad(), torch.autocast(device.type, enabled=False):
+            warnings.simplefilter("ignore")
             g = torch.Generator().manual_seed(0)
             q, k, v, w = (torch.randn(1, 2, n, 64, generator=g).to(device=device, dtype=dtype)
                           for n in (T, P + T, P + T, T))
@@ -165,7 +169,7 @@ def _probe_fused(device, dtype, masked, sdpa=None):
             r = [t.detach().float().requires_grad_() for t in x]
             y = blocked_attention(*r, P)
             ref = (y,) + torch.autograd.grad((y * w.float()).sum(), r)
-        return all(float((a.float() - b).norm() / b.norm()) < 0.05
+        return all(float((a.detach().float() - b.detach()).norm() / b.detach().norm()) < 0.05
                    for a, b in zip(got, ref))
     except Exception:                                      # noqa: BLE001
         return False

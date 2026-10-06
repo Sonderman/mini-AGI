@@ -373,7 +373,7 @@ class RecurCoder(nn.Module):
         loss = loss + cfg.ponder_beta * kl.mean()
         steps = (P * torch.arange(1, len(p_terms) + 1, device=x.device)
                  .view(-1, 1, 1)).sum(0)
-        self.last_steps = float(steps.mean())
+        self.last_steps = float(steps.mean().detach())
         # logits are the halting-weighted mixture, so top-1 accuracy measured
         # downstream reflects what the model would actually have emitted
         return halted_logits, loss

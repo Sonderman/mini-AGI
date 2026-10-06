@@ -30,8 +30,18 @@ import threading
 import time
 
 # see train.py: the allocator reads this once at CUDA init, so it has to be
-# set before torch loads
-os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+# set before torch loads - under the name this PyTorch reads (2.9 renamed it)
+def _alloc_var():
+    try:
+        from importlib.metadata import version
+        major, minor = (int(v) for v in version("torch").split(".")[:2])
+        return "PYTORCH_ALLOC_CONF" if (major, minor) >= (2, 9) else "PYTORCH_CUDA_ALLOC_CONF"
+    except Exception:                                      # noqa: BLE001
+        return "PYTORCH_CUDA_ALLOC_CONF"
+
+
+if not any(v in os.environ for v in ("PYTORCH_ALLOC_CONF", "PYTORCH_CUDA_ALLOC_CONF")):
+    os.environ[_alloc_var()] = "expandable_segments:True"
 
 import torch
 from flask import Flask, Response, jsonify, request

@@ -19,6 +19,10 @@ holds most of it, so it cannot disturb a run.
                in time and memory at that window
   matmuls      the model's own shapes - the expert layer's batched multiplies
                and the trunk's - in fp32, bf16 and fp16, in TFLOP/s
+  ops          the other things a learning step does - adding the experts'
+               outputs back together, gathering and scattering, a weight
+               gradient, the elementwise work - each timed in bf16 and fp32,
+               so a slowdown in one precision can be pinned on what causes it
   reading      one learning step of a model of the real size (random weights,
                in a temporary directory, deleted after): its forward over the
                whole window and its backward, in bf16 and in fp32, as
@@ -100,9 +104,15 @@ def describe(dev):
         print(f"  CPU, {torch.get_num_threads()} threads, "
               f"bf16 in hardware: {'yes' if cpu_bf16_native() else 'no'}")
     for k in ("TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL", "MINAGI_ATTENTION",
-              "PYTORCH_HIP_ALLOC_CONF", "PYTORCH_CUDA_ALLOC_CONF"):
+              "MINAGI_GPU_BF16", "MINAGI_CPU_BF16", "PYTORCH_HIP_ALLOC_CONF",
+              "PYTORCH_CUDA_ALLOC_CONF", "PYTORCH_ALLOC_CONF"):
         if os.environ.get(k) is not None:
             print(f"  {k}={os.environ[k]}")
+    from minagi.config import get, load
+    from minagi.precision import describe
+    asked = get(load(), "training.precision", "bf16")
+    set_compute_dtype(asked)
+    print(f"  a run here, configured for {asked}, computes in {describe(dev)}")
     print()
 
 
@@ -112,13 +122,15 @@ def backends(dev, dt, T, S):
     """Which of PyTorch's fused backends run this shape at all, alone."""
     from torch.nn.attention import SDPBackend, sdpa_kernel
     from torch.nn.attention.bias import causal_lower_right
+    import warnings
     q = torch.randn(1, 8, T, 64, device=dev, dtype=dt)
     kv = torch.randn(1, 8, S, 64, device=dev, dtype=dt)
     got = []
     for name, b in (("flash", SDPBackend.FLASH_ATTENTION),
                     ("efficient", SDPBackend.EFFICIENT_ATTENTION)):
         try:
-            with sdpa_kernel([b]):
+            with warnings.catch_warnings(), sdpa_kernel([b]):
+                warnings.simplefilter("ignore")
                 if S == T:
                     F.scaled_dot_product_attention(q, kv, kv, is_causal=True)
                 else:
@@ -215,6 +227,47 @@ def matmuls(dev, window, dtypes):
     print()
 
 
+# ---- the rest of a learning step, op by op ------------------------------------------
+
+def ops(dev, window, dtypes):
+    """Each kind of work a learning step does besides the big matmuls, in each
+    dtype. A precision that is much slower overall than its matmuls explain is
+    slow in one of these."""
+    N, k, D, F_ = window, 8, 512, 2048
+    per = max(1, window * k // 32)
+    g = torch.Generator().manual_seed(0)
+    t = torch.arange(N).repeat_interleave(k)[torch.randperm(N * k, generator=g)].to(dev)
+    print(f"OPS  (the rest of a learning step at a {window}-character window), ms each")
+    print(f"  {'':52} " + " ".join(f"{n:>7}" for n in dtypes) + "    slowest/fastest")
+    cases = [
+        ("expert outputs added back together (index_add_)", lambda dt: (
+            lambda out=torch.zeros(N, D, device=dev, dtype=dt),
+            src=torch.randn(N * k, D, device=dev, dtype=dt): out.index_add_(0, t, src))),
+        ("characters gathered for the experts, and back", lambda dt: (
+            lambda x=torch.randn(N, D, device=dev, dtype=dt, requires_grad=True),
+            gy=torch.randn(N * k, D, device=dev, dtype=dt): x[t].backward(gy))),
+        ("an expert weight gradient (bmm, transposed)", lambda dt: (
+            lambda a=torch.randn(32, per, D, device=dev, dtype=dt),
+            b=torch.randn(32, per, F_, device=dev, dtype=dt): torch.bmm(a.transpose(1, 2), b))),
+        ("silu(a) * b over every expert's hidden layer", lambda dt: (
+            lambda a=torch.randn(32, per, F_, device=dev, dtype=dt),
+            b=torch.randn(32, per, F_, device=dev, dtype=dt): F.silu(a) * b)),
+    ]
+    for label, make in cases:
+        row, ms = [], []
+        for name in dtypes:
+            try:
+                fn = make(DTYPES[name])
+                v = timed(fn, dev, reps=5, warm=2) * 1e3
+                ms.append(v)
+                row.append(f"{v:7.2f}")
+            except Exception:                              # noqa: BLE001
+                row.append(f"{'-':>7}")
+        ratio = f"{max(ms) / min(ms):10.1f}x" if len(ms) > 1 and min(ms) > 0 else ""
+        print(f"  {label:52} " + " ".join(row) + f"    {ratio}", flush=True)
+    print()
+
+
 # ---- one reading step -------------------------------------------------------------
 
 def reading(dev, window, chunk, precisions, steps, profile):
@@ -235,6 +288,11 @@ def reading(dev, window, chunk, precisions, steps, profile):
         y = data[1:].unsqueeze(0).to(dev)
         for name in precisions:
             set_compute_dtype(name)
+            # measured as named: on a GPU where a run would compute in fp32
+            # instead, bf16 is forced, so the two can be compared
+            forced = os.environ.get("MINAGI_GPU_BF16")
+            if dev.type == "cuda" and name == "bf16":
+                os.environ["MINAGI_GPU_BF16"] = "1"
             model, cfg, pool, _ = T.build_paged(wdir, dev, ram_capacity=40)
             # the depth policy reading runs under, from config.yaml, as train.py sets it
             cfg.train_steps_mean = float(get(c, "model.train_steps_mean", 0.0) or 0.0)
@@ -291,6 +349,10 @@ def reading(dev, window, chunk, precisions, steps, profile):
             except torch.cuda.OutOfMemoryError:
                 print(f"  {name:5} out of memory")
             del model, pool
+            if forced is None:
+                os.environ.pop("MINAGI_GPU_BF16", None)
+            else:
+                os.environ["MINAGI_GPU_BF16"] = forced
             if dev.type == "cuda":
                 torch.cuda.empty_cache()
     finally:
@@ -324,6 +386,7 @@ def main():
     names = ["bf16", "fp32", "fp16"] if dev.type == "cuda" else ["bf16", "fp32"]
     attention(dev, a.window, [n for n in names if n != "fp16"])
     matmuls(dev, a.window, names)
+    ops(dev, a.window, [n for n in names if n != "fp16"])
     if not a.skip_step:
         reading(dev, a.window, a.chunk, a.precisions.split(","), a.steps, a.profile)
 

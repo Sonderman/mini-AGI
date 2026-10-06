@@ -37,7 +37,19 @@ from dataclasses import asdict
 # MiB free and 861 MiB reserved but unallocated. There was plenty of memory;
 # there was no contiguous piece of it. Set it here rather than in a shell so it
 # is a property of the program, not of how it happened to be launched.
-os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+# PyTorch 2.9 renamed the variable and warns about the old name; earlier
+# versions read only the old one.
+def _alloc_var():
+    try:
+        from importlib.metadata import version
+        major, minor = (int(v) for v in version("torch").split(".")[:2])
+        return "PYTORCH_ALLOC_CONF" if (major, minor) >= (2, 9) else "PYTORCH_CUDA_ALLOC_CONF"
+    except Exception:                                      # noqa: BLE001
+        return "PYTORCH_CUDA_ALLOC_CONF"
+
+
+if not any(v in os.environ for v in ("PYTORCH_ALLOC_CONF", "PYTORCH_CUDA_ALLOC_CONF")):
+    os.environ[_alloc_var()] = "expandable_segments:True"
 
 import numpy as np
 import torch
@@ -664,7 +676,8 @@ def cmd_read(args):
     print(f"  {pool.n_experts()} experts on disk, {pool.n_resident()} resident, "
           f"{pool.vram_params()/1e6:.1f}M in VRAM of "
           f"{pool.n_params()/1e6:.1f}M total")
-    print(f"  computing in {args.precision}; weights stay fp32 everywhere, "
+    from minagi.precision import describe
+    print(f"  computing in {describe(device)}; weights stay fp32 everywhere, "
           f"Adam's moments store as bf16")
     # The checkpoint carries whatever depth policy it was trained under, but
     # this is a knob about how to spend compute now, not a property of the

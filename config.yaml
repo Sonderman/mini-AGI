@@ -121,8 +121,9 @@ training:
                           # and the expert files stay fp32
 
   # THE LEARNING RATE IS NOT SCHEDULED. minagi/plasticity.py watches held-out
-  # and moves the rate in both directions: easing it down without evidence of
-  # improvement, stepping it back up when held-out jumps and stays there.
+  # and moves the rate in both directions: up while held-out improves, down
+  # when it measurably gets worse, and back up when held-out jumps and stays
+  # there. The floor (x0.05 of lr) is in plasticity.py.
   chunk: 2048             # characters between steps within the window
   lr: 3.0e-4
   trunk_lr_mult: 0.1      # the trunk is shared by every domain and is where
