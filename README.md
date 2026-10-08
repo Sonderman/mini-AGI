@@ -20,154 +20,116 @@ The "final" weights are **not published yet**. The run is still reading its firs
 
 ![training progress](assets/training_progress.png)
 
-*Every sample round of the run to date: 1,456.2M characters over 2,146 evaluations.*
+*Every sample round of the run to date: 1,535.0M characters over 2,238 evaluations.*
 
 </details>
 
 <details>
 <summary><b>Current quality of samples the model generates</b></summary>
 
-*The round with the lowest held-out loss so far - 0.6353 nats at 1,416.7M characters. Two readings of each prompt: `raw` is plain greedy with no guard at all, `adapted` is the same with the repetition trace on. The whole history is in [runs/samples.txt](runs/samples.txt).*
+*The round with the lowest held-out loss so far - 0.6340 nats at 1,505.9M characters. Two readings of each prompt: `raw` is plain greedy with no guard at all, `adapted` is the same with the repetition trace on. The whole history is in [runs/samples.txt](runs/samples.txt).*
 
 ```
 ==============================================================================
-step 692,110   1416.7M of 7,880M characters (17.98%)   1094 min   336 experts
-context 4,096 characters of 4,096   reading 1,425 char/s   writing 32.8 char/s   still gaining -0.0060 deep into it
-grad norm 1.47 against a clip of 1   clipping
-train loss 0.5099   lr 1.65e-05   evidence t +1.44 over 65.7 (effect +0.0319)   rate x0.055
-held-out loss 0.6353 +/-0.0286 nats   0.9166 bits/char   perplexity 1.89   gap +0.1254
-  arithmetic 0.618   chat 0.611   chat_hermes 0.894   chess 0.410   code 0.533   reasoning 0.547   stories 0.419   wikipedia 1.050
-repeats 21% of 8-grams, greedy with no guard
+step 735,681   1505.9M of 7,880M characters (19.11%)   95 min   380 experts
+context 4,096 characters of 4,096   reading 1,419 char/s   writing 29.7 char/s   still gaining -0.0004 deep into it
+grad norm 1.60 against a clip of 1   clipping
+train loss 0.5360   lr 1.67e-05   evidence t +0.92 over 65.7 (effect +0.0205)   rate x0.056
+held-out loss 0.6340 +/-0.0286 nats   0.9147 bits/char   perplexity 1.89   gap +0.0980
+  arithmetic 0.619   chat 0.607   chat_hermes 0.893   chess 0.406   code 0.532   reasoning 0.554   stories 0.415   wikipedia 1.046
+repeats 10% of 8-grams, greedy with no guard
 ==============================================================================
 
 --- stories ---
 prompt: 'Once upon a time, there was a little boy named Tom. One day he '
-[raw]  repeated 8-grams 8%
-went to the park with his mom. They were having so much fun that Tom didn't want to go to the park. He was sad because he wanted to go to th
-[adapted]  repeated 8-grams 2%
-was playing with his toys when he saw another boy. They were playing together and Tom was very happy.
+[raw]  repeated 8-grams 5%
+went to the park with his mom. Tom was very excited to see the park. He saw a big tree and wanted to climb it. He tried to climb the tree, b
+[adapted]  repeated 8-grams 5%
+was playing with his toys when he saw another boy. The boy was very cute.
 
-Tom wanted to play with them, so he w
+Tom wanted to play with the other boy. He asked, "Can I play with
 
 --- code ---
 prompt: 'def merge_sorted(a, b):\n    '
-[raw]  repeated 8-grams 54%
-    if a.shape == b.shape:
-            return a
-        if b.shape == b.shape:
-            return b
-        if b.shape == b.shape:
-         
-[adapted]  repeated 8-grams 13%
-"""Merges the arguments of any characters in the arguments.
+[raw]  repeated 8-grams 16%
+    """
+        Return the sorted sorted array of sorted arrays.
 
-    Args:
-    ---
-    a:
-  equality
-  b:
-  b:
- equality
- b:
- b:
-equality
- b:
-``
+        Parameters
+        ----------
+        a : array_like
+            A
+[adapted]  repeated 8-grams 53%
+"""
+    Returns any of ``(b,)``, if any, then ``b[0]``, if any,
+    then ``b[0]``, if any, then ``b[0]``, if any,
+    then ``b[0]``, if any,
 
 --- arithmetic ---
 prompt: 'add 4917 + 388 = '
-[raw]  repeated 8-grams 49%
-<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 4+0+1=5c0 </think> 0305
-mul 3 * 3 = 9
-mul 3 * 3 = 9
-mul 3 * 3 = 9
-mul 3 * 3 = 9
-mul 3 * 3 = 9
-mul 3 * 3 = 9
-mul 3 *
-[adapted]  repeated 8-grams 3%
-<think> 7+8+0=5c1 9+8+1=<think> 4+8+0=2c1 9+0+1=0c1 5+0+1=6c0 </think> 672
-mul 3849 * 51 = <think> 3849*1=3849 3849*50=192450 3849+192450=196299 </think> 196299
-mul 7835 * 
+[raw]  repeated 8-grams 36%
+<think> 7+8+0=5c1 0+8+1=0c1 961+0+0=9c0 0+8+0=8c0 0+8+0=8c0 9+0+0=9c0 4+0+0=4c0 6+0+0=6c0 8+0+0=8c0 8+0+0=8c0 8+0+0=8c0 8+0+0=8c0 8+0+0=8c0 8+0+0=
+[adapted]  repeated 8-grams 0%
+<think> 7+8+0=5c1 6+8+1=5c1 924+0+3=4c0 8+8+0=6c1 </think> 6455
+add 7932801 + 4657932 = 12590733
+add 846105 + 297384 = 11434
+add 6928057 + 314692 = 72405
 
 --- chat ---
 prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
-[raw]  repeated 8-grams 0%
-In the conversation, and chess notation, mixed together rather than taken in turn. All of it as raw characters.
-</bot>
-<user>
-what is in your alphabet
-[adapted]  repeated 8-grams 0%
-In the conversation, and chess notation, mixed together rather than taken in turn. All of it as raw characters.
-</bot>
-<user>
-what is beside the exper
+[raw]  repeated 8-grams 2%
+In a directory, one file per expert. That directory is not a copy of me — it is me. When I grow an expert a new file appears; when one is 
+[adapted]  repeated 8-grams 2%
+In a directory, one file per expert. That directory is not a copy of me — it is me. When I grow an expert a new file appears; when one is 
 
 --- chat_hermes ---
 prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
-[raw]  repeated 8-grams 15%
-The train trave0 is 10 km in the km/h.
-
-The 30 minutes in the km/h is 10 km in the km/h.
+[raw]  repeated 8-grams 1%
+The speed in km/h is 1.5 million in km/h.
 </bot>
 <user>
-In the following story, what is the speed of th
-[adapted]  repeated 8-grams 29%
-To find the speed of train traveling 60 km, we'll 25% of the speed of train.
+Generate a sentence that describes the following data: A company can be extracted from the sta
+[adapted]  repeated 8-grams 28%
+To find the speed in km/h, we'll use the formula:
 
-Speed = 60/3
-Speed = 1/3
-Speed = 60/3
-Speed = 15%
-Speed = 15%
+speed = (num)/(num)
 
+where num is the speed in km/h.
+
+So, we'll use the formula:
+
+speed =
 
 --- reasoning ---
 prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
-[raw]  repeated 8-grams 0%
-Okay, let's try to figure out how to approach this. So, the question is about a list of numbers that are not all in a list. The largest numb
+[raw]  repeated 8-grams 5%
+Okay, let's see. I need to find the largest number in a list that contains a list. Let's call it list. Let's start by understanding the func
 [adapted]  repeated 8-grams 0%
-Okay, let's try to figure out how to approach this. So, there's a list. In any list, all numbers are integers. The list contains all the num
+Okay, let's try to figure out how listy and compute any list. There's another way to do it, since we're doing these two changes. Let's break
 
 --- wikipedia ---
 prompt: '== History ==\nThe [[Roman Empire]] was '
-[raw]  repeated 8-grams 68%
-a contisen.  The empire was a continent who was a continent who was a continent who was a continent who was a continent who was a continent 
-[adapted]  repeated 8-grams 33%
-founde10,563 km (20,473).
-
-== [http://www.romanemp.doc.uk/ Roman empi.doc.uk/]
-*[http://www.romanemp.doc.u310 Roman empi.doc.uk/]
-*[http://w
+[raw]  repeated 8-grams 26%
+founde17 years old.  The [[Roman Empire]] was founded in [[1908]] by [[Roman Empire|Roman]] [[Empire]] in [[1908]].  The [[Roman Empire|Roma
+[adapted]  repeated 8-grams 36%
+founde17,023 km/hr.  There was nothing to do.
+*[[Alexandria]] was founded in [[1905]].
+*[[Alexandria]] was founded in [[1905]].
+*[[Alexandri
 
 --- chess ---
 prompt: '<g>1700 1-0 1. e4 e5 2. '
-[raw]  repeated 8-grams 0%   18 legal moves, then Nge2
-d4 d6 3. d5 Nf6 4. Nc3 Bg4 5. f3 Bd7 6. Be2 Be7 7. Bg5 h6 8. Bh4 g5 9. Bg3 Nh5 10. Bxe5 dxe5 11. Nge2 Nd7 12. Ng3 Nc5 13. Nd1 Nd3+ 14. Kf2 N
-[adapted]  repeated 8-grams 0%   4 legal moves, then axb19
-d3 Nc6 3. f4 d5
-axb19 7. fxe5 Bg4 8. Nf3 Bxf3 9. Qxf3 dxe4 10. dxe4 Nxe5 11. Qf2 Ng6 12. Bc4 Ne5 13. O-O Bd6 14. f5 Ne7 15. Bf4 O-O 16. Nc3 
+[raw]  repeated 8-grams 0%   18 legal moves, then Qxa1
+Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Nxd5 6. Qf3 Qxg5 7. Bxd5 Qe7 8. Nc3 Nd4 9. Qd1 Nxc2+ 10. Kf1 Nxa1 11. Qxa1 Be6 12. Nd5 Bxd5 13. Bxd5 c6
+[adapted]  repeated 8-grams 0%   10 legal moves, then Nc1
+Nf3 d6 3. Bc4 h6 4. d3 Nf6 5. O-O Be7 6. h3 O-O 7. Nc1 a6 8. Be3 b5 9. a3 Be6 10. Nd2 c5 11. Ndf3 Nc6 12. Bxe6 fxe6 13. Nh2 Qd7 14. Ng4 Rf7 
 
 --- self-knowledge ---
 prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
-[raw]  repeated 8-grams 0%
-A small term pushes routing to spread that is 10. The pool is .15 minutes to change them.
-</bot>
-
-
-<user>
-how do you learn mechanically
-</user>
-<bot>
-Adam with 
-[adapted]  repeated 8-grams 0%
-A small term pushes routing to spread that is 10. The pool is .15 minutes to change them.
-</bot>
-<user>
-what is the middle tier
-</user>
-<bot>
-The same shape, na
+[raw]  repeated 8-grams 1%
+A small term pushes routing to spread across the experts on the card rather than piling onto a few, so that one expert does not absorb every
+[adapted]  repeated 8-grams 1%
+A small term pushes routing to spread across the experts on the card rather than piling onto a few, so that one expert does not absorb every
 ```
 
 </details>
@@ -402,25 +364,25 @@ The numbers below are for tracking purposes and move as the run continues. Held-
 There is a second variance underneath these figures. The same configuration run twice lands about 0.014 apart, because the expert dispatch is not deterministic on CUDA. **Treat about 0.03 as the threshold for a real difference**, not the error bar printed beside one score.
 
 <!-- auto:benchmarks -->
-**Where the model is** (1,456.2M characters read, 356 experts):
+**Where the model is** (1,535.0M characters read, 395 experts):
 
 | | nats/char | bits/byte |
 |---|---|---|
-| **held-out, all 8 subjects** | **0.6382** ± 0.0287 | **0.9208** |
-| train | 0.5382 | 0.7765 |
+| **held-out, all 8 subjects** | **0.6379** ± 0.0287 | **0.9203** |
+| train | 0.5267 | 0.7599 |
 
 **Held-out loss per subject:**
 
 | Subject | nats/char | bits/byte |
 |---|---|---|
-| `chess` | 0.409 | 0.590 |
+| `chess` | 0.406 | 0.586 |
 | `stories` | 0.420 | 0.606 |
 | `code` | 0.534 | 0.770 |
-| `reasoning` | 0.556 | 0.802 |
-| `chat` | 0.615 | 0.887 |
-| `arithmetic` | 0.620 | 0.894 |
-| `chat_hermes` | 0.900 | 1.298 |
-| `wikipedia` | 1.052 | 1.518 |
+| `reasoning` | 0.552 | 0.796 |
+| `chat` | 0.617 | 0.890 |
+| `arithmetic` | 0.621 | 0.896 |
+| `chat_hermes` | 0.906 | 1.307 |
+| `wikipedia` | 1.047 | 1.511 |
 <!-- /auto:benchmarks -->
 
 ### Data Scaling
@@ -430,14 +392,14 @@ There is a second variance underneath these figures. The same configuration run 
 
 Every point on this chart is a **bits-per-byte on the PG19 test split** - one held-out set, so the comparison is direct. This model scores **2.091 BPB** over the whole split (100 books, 41,289,001 bytes) at a context of 4,096, against its own mixture's 0.94. PG19 is out of distribution for it: it was trained on a corpus assembled for this project and has read no Victorian novels, so much of that gap is subject matter rather than capability.
 
-**The results so far are promising.** The red line is the fitted power law on this model's own held-out, `L ∝ D^-0.226` with R² 0.98 over every point past the warmup - between Kaplan's 0.095 and Chinchilla's 0.28, and it has held for more than a decade of data. How steep it looks depends on where the fit starts, and the band on the chart spans that range rather than pretending to one number.
+**The results so far are promising.** The red line is the fitted power law on this model's own held-out, `L ∝ D^-0.223` with R² 0.98 over every point past the warmup - between Kaplan's 0.095 and Chinchilla's 0.28, and it has held for more than a decade of data. How steep it looks depends on where the fit starts, and the band on the chart spans that range rather than pretending to one number.
 
-Read straight off that trend, on this model's own mixture. It has read 1.46B characters so far, in about 17 days of running. The days below assume the pace of the last 28 hours of it: 1,135 characters a second on the wall clock, held-out checks and rounds of samples included, because the reading waits for them.
+Read straight off that trend, on this model's own mixture. It has read 1.53B characters so far, in about 18 days of running. The days below assume the pace of the last 8 hours of it: 1,234 characters a second on the wall clock, held-out checks and rounds of samples included, because the reading waits for them.
 
-| held-out | total data read | further reading | days from here at ~1,135 char/s |
+| held-out | total data read | further reading | days from here at ~1,234 char/s |
 |---|---|---|---|
-| 0.80 BPB | 2.72B | +1.26B | ~13 |
-| **0.63 BPB** | 7.88B | +6.42B | **~65** |
+| 0.80 BPB | 2.88B | +1.35B | ~13 |
+| **0.64 BPB** | 7.88B | +6.34B | **~60** |
 
 The first one is days of reading on one laptop GPU, and it sits inside a single pass of the 7.88B-character corpus.
 
@@ -450,15 +412,15 @@ NVIDIA and AMD GPUs both run it, and so does a CPU on its own. Speeds at the set
 
 | Hardware | Computes in | Reading | Writing | VRAM used |
 |---|---|---|---|---|
-| NVIDIA RTX 3070 Laptop, 8 GB | bf16 | 1,528 char/s | 27.0 char/s | 5.8 GiB |
-| AMD Radeon RX 6800 XT, 16 GB | fp32 (its default) | 1,242 char/s | 35.2 char/s | 13.2 GiB |
-| AMD Radeon RX 6800 XT, 16 GB | bf16 | 336 char/s | 15.3 char/s | 7.6 GiB |
-| AMD Ryzen 9 9900X, CPU only | bf16 | 186 char/s | 29.9 char/s | - |
+| NVIDIA RTX 3070 Laptop, 8 GB | bf16 | 2,042 char/s | 28.4 char/s | 5.1 GiB |
+| AMD Radeon RX 6800 XT, 16 GB | fp32 (its default) | 1,388 char/s | 34.7 char/s | 10.1 GiB |
+| AMD Radeon RX 6800 XT, 16 GB | bf16 | 301 char/s | 15.1 char/s | 7.1 GiB |
+| AMD Ryzen 9 9900X, CPU only | bf16 | 186 char/s | 27.6 char/s | - |
 
-Reading is learning: characters trained on per second. Writing is a reply being generated. The AMD figures were measured on an earlier snapshot of the weights, with 127 experts rather than 259; either way only 32 are on the card at a time.
+Reading is learning: characters trained on per second. Writing is a reply being generated. The speeds were measured on early snapshots of the weights, with 127-133 experts. Only 32 experts are on the card at a time, so the pool's size barely moves VRAM, but a larger pool still reads more slowly, because less of it fits in RAM and more comes from disk: the current model, 355 experts, reads about 1,310 characters a second on the 3070.
 
 - **NVIDIA** - tested on the RTX 3070 Laptop. Every card from the RTX 30 series on computes bf16 in hardware.
-- **AMD** - needs PyTorch's ROCm build (tested: torch 2.9.1 on ROCm 6.4). The RX 6000 series (RDNA2) has no bf16 arithmetic, so on a card with 14 GB or more the model computes in fp32 by itself: 3.7 times faster than bf16 on the 6800 XT. A card with less stays in bf16, the third row: it peaks at 7.6 GiB, so it fits an 8 GB card with little to spare, at about a quarter of fp32's speed. On a bigger card `MINAGI_GPU_BF16=1` chooses it, to leave memory for something else. PyTorch ships no fused attention kernels for these cards, so attention is computed in blocks - without the memory blow-up of PyTorch's own fallback.
+- **AMD** - needs PyTorch's ROCm build (tested: torch 2.9.1 on ROCm 6.4). The RX 6000 series (RDNA2) has no bf16 arithmetic, so on a card with 14 GB or more the model computes in fp32 by itself: 4.6 times faster than bf16 on the 6800 XT. A card with less stays in bf16, the third row: it peaks at 7.1 GiB, so it fits an 8 GB card, at about a fifth of fp32's speed. On a bigger card `MINAGI_GPU_BF16=1` chooses it, to leave memory for something else. PyTorch ships no fused attention kernels for these cards, so attention is computed in blocks - without the memory blow-up of PyTorch's own fallback.
 - **CPU** - bf16 where the CPU has it in hardware (AMD Zen 4 and later, Intel with AVX-512 BF16 or AMX), fp32 otherwise.
 
 `python3 tools/device_check.py` measures what a particular machine does with the model: which attention kernels it has, bf16 against fp32, and one learning step.
@@ -582,17 +544,17 @@ Byte level - vocabulary 265: the 256 byte values plus 9 structural markers (`<th
 | paging | 32 experts resident on the card; the rest live on disk |
 
 <!-- auto:params -->
-The parameter count moves, because the pool grows and prunes itself while training. `python3 -m minagi.store weights` prints what it is now. At step 711,398:
+The parameter count moves, because the pool grows and prunes itself while training. `python3 -m minagi.store weights` prints what it is now. At step 750,109:
 
 ```
 core        8.27M  embeddings, attention, norms, adapter, halting head
-routers     0.18M  one row per expert at each call site, depth embedding, gates
-experts  1119.9M   356 x 3.15M each  (3 x 512 x 2048)
+routers     0.20M  one row per expert at each call site, depth embedding, gates
+experts  1242.6M   395 x 3.15M each  (3 x 512 x 2048)
 ----------------------
-total    1128.3M
+total    1251.0M
 ```
 
-**VRAM is set by the card's 32 slots, not by the pool.** Only 32 experts are resident at a time - about 109M parameters of the 1128M - which is why the pool can keep growing on an 8 GB card. Per byte the model activates about **345M** parameters - two prelude blocks, then attention and top-8 of the resident experts on each recurrent step, counted at the 12.8 steps training samples its depth around (a character may take up to 24) - so by the 6ND rule it costs the same per byte as a dense 345M byte-level transformer, not a 1128M one. That is the figure the scaling chart in Benchmarks is drawn against.
+**VRAM is set by the card's 32 slots, not by the pool.** Only 32 experts are resident at a time - about 109M parameters of the 1251M - which is why the pool can keep growing on an 8 GB card. Per byte the model activates about **345M** parameters - two prelude blocks, then attention and top-8 of the resident experts on each recurrent step, counted at the 12.8 steps training samples its depth around (a character may take up to 24) - so by the 6ND rule it costs the same per byte as a dense 345M byte-level transformer, not a 1251M one. That is the figure the scaling chart in Benchmarks is drawn against.
 <!-- /auto:params -->
 
 ## AI usage

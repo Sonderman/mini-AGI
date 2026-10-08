@@ -70,15 +70,90 @@ weights.
 
 import math
 import os
+import struct
 import weakref
+import zipfile
 from collections import OrderedDict
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from numpy.lib import format as npy
 
 from .precision import is_moment, pack_bf16, unpack_bf16
+
+_WEIGHTS = ("w1", "w3", "w2")
+_MOMENTS = ("w1_m", "w3_m", "w2_m", "w1_v", "w3_v", "w2_v")
+_ZIP_LOCAL = struct.Struct("<4s5H3L2H")       # a zip member's local file header
+
+
+def read_npz(path, names):
+    """
+    The named arrays of an .npz, each read from the file straight into its
+    own memory.
+
+    np.load's way through an archive costs more than the bytes it moves: a
+    CRC over every member, read in 256 KB pieces and copied twice on the way
+    into the array. Measured on the live run, the CRC alone was a tenth of
+    the main thread's time. np.savez stores its members uncompressed, so an
+    array's bytes lie contiguous in the file and one read puts them in place.
+    Anything else - a compressed member, a header this does not parse - goes
+    through np.load. Truncation is still caught: a member must be exactly as
+    long as its own header says.
+    """
+    out = {}
+    with open(path, "rb", buffering=0) as f:
+        members = {zi.filename[:-4]: zi for zi in zipfile.ZipFile(f).infolist()
+                   if zi.filename.endswith(".npy")}
+        for k in names:
+            zi = members.get(k)
+            if zi is None:
+                continue
+            a = _read_stored(f, zi) if zi.compress_type == zipfile.ZIP_STORED else None
+            if a is None:
+                with np.load(path) as z:
+                    a = z[k]
+            out[k] = a
+    return out
+
+
+def _read_stored(f, zi):
+    f.seek(zi.header_offset)
+    sig, *_, n_name, n_extra = _ZIP_LOCAL.unpack(_read_exactly(f, _ZIP_LOCAL.size))
+    if sig != b"PK\x03\x04":
+        raise ValueError(f"{zi.filename}: no local header where the directory says")
+    start = zi.header_offset + _ZIP_LOCAL.size + n_name + n_extra
+    f.seek(start)
+    version = npy.read_magic(f)
+    if version not in ((1, 0), (2, 0)):
+        return None
+    shape, fortran, dtype = (npy.read_array_header_1_0(f) if version == (1, 0)
+                             else npy.read_array_header_2_0(f))
+    if dtype.hasobject:
+        return None
+    a = np.empty(shape, dtype=dtype, order="F" if fortran else "C")
+    if f.tell() - start + a.nbytes != zi.file_size:
+        raise ValueError(f"{zi.filename}: {zi.file_size} bytes in the archive, "
+                         f"{f.tell() - start + a.nbytes} by its own header")
+    view = memoryview(a.reshape(-1, order="A").view(np.uint8))
+    got = 0
+    while got < a.nbytes:
+        n = f.readinto(view[got:])
+        if not n:
+            raise ValueError(f"{zi.filename}: ends {a.nbytes - got} bytes early")
+        got += n
+    return a
+
+
+def _read_exactly(f, n):
+    b = f.read(n)
+    while len(b) < n:                          # an unbuffered read may come short
+        more = f.read(n - len(b))
+        if not more:
+            break
+        b += more
+    return b
 
 
 def _tally(total, add):
@@ -139,13 +214,15 @@ class Tiers:
         file the whole of what that expert is, which is what the weights
         directory claims about itself.
         """
-        z = np.load(self._file(i))
-        out = {k: torch.from_numpy(z[k]).clone() for k in ("w1", "w3", "w2")}
-        for k in ("w1_m", "w3_m", "w2_m", "w1_v", "w3_v", "w2_v"):
-            if k in z.files:
+        z = read_npz(self._file(i), _WEIGHTS + _MOMENTS)
+        # every array was read into memory of its own, so the tensors take it
+        # over rather than copying it
+        out = {k: torch.from_numpy(z[k]) for k in _WEIGHTS}
+        for k in _MOMENTS:
+            if k in z:
                 # bf16 if this file has been written since the moments were
                 # narrowed, fp32 if it has not; unpack_bf16 reads both
-                out[k] = unpack_bf16(z[k]).clone()
+                out[k] = unpack_bf16(z[k])
         return out
 
     def fetch(self, i, count=True):
