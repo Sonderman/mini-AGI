@@ -1,10 +1,12 @@
 # AGENTS.md — mini-AGI, Ali's local working copy
 
 Scope: local checkout of **volotat/mini-AGI**, kept rebased onto upstream — upstream advanced while
-this copy was being set up, and the local branch was **rebased onto `e6cfda8` on 2026-10-07** (reading-speed
-work; AMD support + a robust LR controller; `PYTORCH_ALLOC_CONF` rename handled; `pool.balance` retuned 3.5e-4
--> 2.5e-4; `runs/samples.txt` kept as ours - upstream appends their own history) with the two local
-commits (`serve` guard, this file) on top. The model is a
+this copy was being set up, and the local branch was **rebased onto `5c57a38` on 2026-10-08** (faster expert
+loading in `minagi/paged.py`; README/assets). The 2026-10-07 rebase onto `e6cfda8` had brought reading-speed
+work, AMD support + a robust LR controller, the `PYTORCH_ALLOC_CONF` rename fix and `pool.balance` retuned
+3.5e-4 -> 2.5e-4; `runs/samples.txt` is kept as ours - upstream appends their own history. Seven local
+commits ride on top: `serve` guard + UI defaults, this file, `start.bat`, the self-knowledge passage, the
+samples history. The model is a
 continually-learning byte-level LM that assembles its own architecture, trains on a single ≥8 GB GPU,
 keeps its weights as files on disk and pages them onto the card. This copy is set up and verified to
 run on this machine (Windows + RTX 5060 8 GB). It is NOT portable: `.venv/`, `data/` and `weights/`
@@ -68,7 +70,12 @@ against ~2,600 before it - external load suspected, not the model. A `--minutes 
   its final samples answer `What are you?` with the primed self-description - the first meaningful
   chat answer. An overnight `--minutes 901` session (71,593 -> 134,197; 128.21M characters; held-out 1.0107 ->
   **0.7942** (-0.2165, ~15 sigma); pool 138 -> 202) held ~2.5-2.8k char/s through the night; its
-  greedy samples got rougher despite the loss drop (generation quality is not monotone in loss). Without `--save` it is a dry read and `weights/` is untouched.
+  greedy samples got rougher despite the loss drop (generation quality is not monotone in loss). A `--minutes 60` session on the new `paged.py` code (134,197 ->
+  137,681; 7.14M characters; 0.7939 -> 0.7850; pool 202 -> 205) held ~2.3-2.4k char/s and its samples
+  already echo the edited count-free self-knowledge text. A `--minutes 240` session (137,681 -> 151,656; 28.62M characters; 0.7850 ->
+  0.7792; pool 205 -> 220) hit a plateau: 4 hours bought only -0.0058 and the train/held-out gap
+  closed to ~+0.002; fresh data (data_stage + big chess) is the next lever. Chess samples run
+  12-15 legal moves now. Without `--save` it is a dry read and `weights/` is untouched.
   `weights/` is untouched.
 - Serve the web UI:
   ```
@@ -79,7 +86,7 @@ against ~2,600 before it - external load suspected, not the model. A `--minutes 
   Or double-click **`start.bat`** — checks the venv, refuses to start a second instance, opens the
   browser when the model is ready; extra arguments are forwarded (`start.bat --no-learn`).
 - Inspect the model (verified): `.venv/Scripts/python.exe -m minagi.store weights`
-  → e.g. `step 134,197`, 202 experts, 206 files, 5553.1 MB (176 carrying + 26 gated; 643.8M params).
+  → e.g. `step 151,656`, 220 experts, 224 files, 5993.7 MB (195 carrying + 25 gated; 700.4M params).
   `train.py read --help` lists every knob.
 
 ## File map
@@ -89,7 +96,7 @@ against ~2,600 before it - external load suspected, not the model. A `--minutes 
 | `minagi/`, `train.py`, `serve.py`, `corpora/`, `replication/`, `tools/`, `config.yaml`, `README.md` | upstream code and docs; README is authoritative on model design and flags | upstream; `serve.py` carries one local patch (below) |
 | `.venv/` | this machine's Python + packages (torch 2.9.1+cu128) | rebuild with uv (recipe above) |
 | `start.bat` | local launcher for the web UI: venv check, duplicate-server guard, opens the browser when the model is ready; forwards extra args to serve.py | Ali/Hermes; keep in sync with serve.py flags |
-| `weights/` | THE model — best state so far (step 134,197, 202 experts, ≈5.55 GB). Written atomically; grows/prunes experts itself | written by `read --save` and by `serve` in learning mode; never hand-edit |
+| `weights/` | THE model — best state so far (step 151,656, 220 experts, ≈5.99 GB). Written atomically; grows/prunes experts itself | written by `read --save` and by `serve` in learning mode; never hand-edit |
 | `data/train`, `data/val` | the corpus the reader opens; subjects = top-level dirs (arithmetic, chat, chess, code, reasoning, stories, wikipedia, self-knowledge (added 2026-10-07; serve's prime source); `chat/hermes` is the OpenHermes part of the chat lane) | `corpora all` / `corpora expand` |
 | `data_*_char/` | intermediate uint16 `.bin` sources for `expand` (code, arithmetic, chat, chess; chess rebuilt 2026-10-05: 4M games → 1.95B tokens) | the generators; keep — `expand --only` rebuilds `data/` from them without re-downloading |
 | `runs/` | logs, sample history (`samples.txt` is the tracked one), dashboard/progress PNGs, `corpus_index.json` cache | training writes; nothing else there is committed |
@@ -150,11 +157,13 @@ against ~2,600 before it - external load suspected, not the model. A `--minutes 
 
 ## State left behind (2026-10-08)
 
-`weights/` = final state after the training runs (**step 134,197, 202 experts - 176 carrying
-+ 26 gated, 5,553.1 MB, 643.8M params**; held-out **0.7942** nats after the overnight session -
-1.0107 before it; best subject chess 0.561, worst wikipedia 1.193). Context 3,516 of 4,096;
-`optim.npz` healthy. `data/` complete but still the SAMPLED
-corpus; the extended material waits in `data_stage/` (≈37 GB; wiring pending Ali's approval), and
-`data_chess_char/` has been rebuilt (4M games, 1.95B tokens, 5.5 GB). `data_*` intermediates kept;
-the web UI can stay up via `start.bat`; the real run is simply the train command above, left alone
-for days.
+`weights/` = final state after the training runs (**step 151,656, 220 experts - 195 carrying
++ 25 gated, 5,993.7 MB, 700.4M params**; held-out **0.7792** nats after the 4-hour session -
+0.7850 before it; best subject chess 0.544, worst wikipedia 1.169). The 4-hour session hit a
+plateau (-0.0058, train/held-out gap ~+0.002) - data_stage wiring + the rebuilt chess are the
+next lever. Context 3,570 of 4,096; `optim.npz` healthy. `data/` complete but still the SAMPLED
+corpus, read 310.6M of 2,646.8M (11.73%); the extended material waits in `data_stage/` (≈37 GB;
+wiring in progress 2026-10-08), and `data_chess_char/` has been rebuilt (4M games, 1.95B tokens,
+5.5 GB, not yet expanded into `data/`). `data_*` intermediates kept; the web UI runs via `start.bat`
+(or scratch/serve_supervisor.py, which restarts it on exit and logs exit codes); the real run is
+simply the train command above, left alone for days.
