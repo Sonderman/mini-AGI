@@ -1,13 +1,20 @@
 # AGENTS.md — mini-AGI, Ali's local working copy
 
-Scope: local checkout of **volotat/mini-AGI** (HEAD `7361e7a "training process update"`, cloned
-2026-10-02) — a continually-learning byte-level language model that assembles its own architecture,
-trains on a single ≥8 GB GPU, keeps its weights as files on disk and pages them onto the card. This
-copy is set up and verified to run on this machine (Windows + RTX 5060 8 GB). It is NOT portable:
-`.venv/`, `data/` and `weights/` are machine-local state. `minagi/`, `corpora/`, `train.py`, `serve.py`
-are upstream: touch them only for real upstream work, and re-check the local patch after every pull.
+Scope: local checkout of **volotat/mini-AGI**, kept rebased onto upstream — upstream advanced while
+this copy was being set up, and the local branch was **rebased onto `e6cfda8` on 2026-10-07** (reading-speed
+work; AMD support + a robust LR controller; `PYTORCH_ALLOC_CONF` rename handled; `pool.balance` retuned 3.5e-4
+-> 2.5e-4; `runs/samples.txt` kept as ours - upstream appends their own history) with the two local
+commits (`serve` guard, this file) on top. The model is a
+continually-learning byte-level LM that assembles its own architecture, trains on a single ≥8 GB GPU,
+keeps its weights as files on disk and pages them onto the card. This copy is set up and verified to
+run on this machine (Windows + RTX 5060 8 GB). It is NOT portable: `.venv/`, `data/` and `weights/`
+are machine-local state. `minagi/`, `corpora/`, `train.py`, `serve.py` are upstream: touch them only
+for real upstream work, and re-check the local patch after every pull. The 2026-10-05 upstream
+commits (re-verified on this machine: existing weights load and train) added `pool.balance` (replaces
+`explore_bias`), `pool.select_temperature` and `tools/device_check.py`.
 
-Maintainer: Ali. The clone kept its `origin` remote, but this copy is local-only: **never push**.
+Maintainer: Ali. Remotes: **`origin` = Ali's fork**, `github.com/Sonderman/mini-AGI` (the push
+target); **`upstream` = volotat/mini-AGI**. Push to origin only when Ali asks; never push upstream.
 Commits only after Ali asks.
 
 ## Environment (verified 2026-10-02)
@@ -34,7 +41,7 @@ Run from the repo root — the venv python opens `data/` and `weights/` relative
   ```
   .venv/Scripts/python.exe -m corpora all
   ```
-  → built `data/train` + `data/val`; the reader sees **86,121 files / 2,646.8M characters**, `data/` ≈ 2.8 GB.
+  → built `data/train` + `data/val`; the reader sees **86,122 files / 2,646.8M characters** (86,121 + the self-knowledge prime file), `data/` ≈ 2.8 GB.
   `--limit N` for a small trial, `--full` for entire datasets (tens of GB, hours), `--only LANE…` to
   rebuild one lane. The build ends with a spurious `!! self-knowledge produced nothing` (see Warts);
   exit code is still 0.
@@ -42,16 +49,38 @@ Run from the repo root — the venv python opens `data/` and `weights/` relative
   ```
   .venv/Scripts/python.exe train.py read data/train --save --held-out data/val --sample-every 10
   ```
-  Verified short form `… train.py read --save --minutes 3`: exit 0, **~3.2k char/s**, checkpoint written
-  at step 519, held-out 3.3342 → 3.0248. Without `--save` it is a dry read and `weights/` is untouched.
+  Verified runs: `--minutes 3` (held-out 3.3342 → 3.0248), `--minutes 10` (step 519 → 1,434), two
+  `--minutes 30` sessions (step 1,435 → 4,274 → 6,987), a `--minutes 50` session (step 6,988 →
+  11,678 at 9.61M characters) and a `--minutes 240` session (step 11,679 → 31,589 at 40.78M
+  characters; held-out 1.6137 → 1.2245; pool 76 → 97). After the 2026-10-05 upstream rebase (new
+  `pool.balance` term): a `--minutes 30` session took step 31,590 → 33,716 (4.36M characters;
+  held-out 1.2245 → 1.1779; pool 97 → 99), and a `--minutes 120` session took step 33,717 → 42,255
+  (17.49M characters; held-out 1.1779 → 1.1339; pool 99 → 108). Its first launch was cut within
+  minutes by an interruption; the background job was re-launched on the next Hermes start and ran
+  checkpoints are atomic, nothing was lost. A `--minutes 240` session (step 42,256 → 49,411; 14.64M characters; held-out 1.1339 → 1.1260; pool 108 → 115) was cut by a power failure minutes from its end — the last checkpoint held everything; the follow-up `--minutes 30` (49,411 → 51,391; 4.06M characters; pool 115 → 117; held-out 1.1240 → 1.1426, inside the ±0.02 stderr) ran on fresh Adam moments (Warts #4) and rebuilt `optim.npz`. A `--minutes 45` session (51,391 → 54,121; 5.59M characters; held-out 1.1426 →
+1.0829 — Δ/SE ≈ 2.0, the largest single drop of the recent runs; pool 117 → 120)
+ran on those restored moments. A `--minutes 120` session (54,121 → 58,692; 9.36M characters; held-out 1.0829 →
+1.0411; pool 120 → 125) followed: the evening launch died before reading anything and the
+host re-started it from the same checkpoint the next morning; its last hour read at ~450 char/s
+against ~2,600 before it - external load suspected, not the model. A `--minutes 180` session on the rebased code (58,692 ->
+  71,593; 26.42M characters; held-out 1.0411 -> 1.0107; pool 125 -> 138) held **2.7-2.9k char/s**
+  across the whole session (no slowdown - upstream's reading-speed commit; `balance 0.00025`) and
+  its final samples answer `What are you?` with the primed self-description - the first meaningful
+  chat answer. An overnight `--minutes 901` session (71,593 -> 134,197; 128.21M characters; held-out 1.0107 ->
+  **0.7942** (-0.2165, ~15 sigma); pool 138 -> 202) held ~2.5-2.8k char/s through the night; its
+  greedy samples got rougher despite the loss drop (generation quality is not monotone in loss). Without `--save` it is a dry read and `weights/` is untouched.
+  `weights/` is untouched.
 - Serve the web UI:
   ```
   .venv/Scripts/python.exe serve.py --port 8080        # → http://127.0.0.1:8080   (HTTP 200 verified)
   ```
   **Learning is ON by default**: chats feed the learner and every 8 steps are saved into `weights/`
-  (a streamed reply runs at ~18 char/s). Pass `--no-learn` to serve read-only.
+  (a streamed reply runs at ~18 char/s; the local reply cap is 2048 chars). Pass `--no-learn` to serve read-only.
+  Or double-click **`start.bat`** — checks the venv, refuses to start a second instance, opens the
+  browser when the model is ready; extra arguments are forwarded (`start.bat --no-learn`).
 - Inspect the model (verified): `.venv/Scripts/python.exe -m minagi.store weights`
-  → e.g. `step 519`, 65 experts, 69 files, 2091.9 MB. `train.py read --help` lists every knob.
+  → e.g. `step 134,197`, 202 experts, 206 files, 5553.1 MB (176 carrying + 26 gated; 643.8M params).
+  `train.py read --help` lists every knob.
 
 ## File map
 
@@ -59,17 +88,22 @@ Run from the repo root — the venv python opens `data/` and `weights/` relative
 |---|---|---|
 | `minagi/`, `train.py`, `serve.py`, `corpora/`, `replication/`, `tools/`, `config.yaml`, `README.md` | upstream code and docs; README is authoritative on model design and flags | upstream; `serve.py` carries one local patch (below) |
 | `.venv/` | this machine's Python + packages (torch 2.9.1+cu128) | rebuild with uv (recipe above) |
-| `weights/` | THE model — best state so far (step 519, 65 experts, ~2.1 GB). Written atomically; grows/prunes experts itself | written by `read --save` and by `serve` in learning mode; never hand-edit |
-| `data/train`, `data/val` | the corpus the reader opens; subjects = top-level dirs (arithmetic, chat, chess, code, reasoning, stories, wikipedia; `chat/hermes` is the OpenHermes part of the chat lane) | `corpora all` / `corpora expand` |
-| `data_*_char/` | intermediate uint16 `.bin` sources for `expand` (code, arithmetic, chat, chess) | the generators; keep — `expand --only` rebuilds `data/` from them without re-downloading |
-| `runs/` | logs, sample history (`samples.txt` is the one tracked file) and the `corpus_index.json` file cache | training writes; nothing else there is committed |
+| `start.bat` | local launcher for the web UI: venv check, duplicate-server guard, opens the browser when the model is ready; forwards extra args to serve.py | Ali/Hermes; keep in sync with serve.py flags |
+| `weights/` | THE model — best state so far (step 134,197, 202 experts, ≈5.55 GB). Written atomically; grows/prunes experts itself | written by `read --save` and by `serve` in learning mode; never hand-edit |
+| `data/train`, `data/val` | the corpus the reader opens; subjects = top-level dirs (arithmetic, chat, chess, code, reasoning, stories, wikipedia, self-knowledge (added 2026-10-07; serve's prime source); `chat/hermes` is the OpenHermes part of the chat lane) | `corpora all` / `corpora expand` |
+| `data_*_char/` | intermediate uint16 `.bin` sources for `expand` (code, arithmetic, chat, chess; chess rebuilt 2026-10-05: 4M games → 1.95B tokens) | the generators; keep — `expand --only` rebuilds `data/` from them without re-downloading |
+| `runs/` | logs, sample history (`samples.txt` is the tracked one), dashboard/progress PNGs, `corpus_index.json` cache | training writes; nothing else there is committed |
+| `data_stage/` | staged extra corpus, NOT yet wired into `data/` (staged 2026-10-05 while a long run was reading): supersets of wikipedia/stories/chat/reasoning, a new pg19 book lane (28,602 books) and a `turkce` lane (wiki/web/web2/cosmos/hukuk/chat, ≈17 GB) | Ali/Hermes; wiring (swap + expand) only while nothing reads `data/` |
 
 ## Invariants (do not break these)
 
-1. **No push, and no commits without Ali saying so.** `origin` exists only because this was cloned.
+1. **No push, and no commits without Ali's say-so.** `origin` is Ali's fork (`Sonderman/mini-AGI`) —
+   the only push target; `upstream` points at volotat's repo, never push there.
 2. **`weights/` is the model.** The first run creates it from `config.yaml`; every later run resumes
-   from it (weights + Adam moments + step count) and advances it only when it improves on what is
-   there. Deleting it deletes the model.
+   from it (weights + Adam moments + step count) and advances it at every checkpoint — `read` mode writes the current state
+   unconditionally (that is how reading progress carries forward; run-final saves set
+   `val: null`), while the improve-only save and the divergence-revert live in `stream` mode
+   (train.py:308). Deleting it deletes the model.
 3. **Do not run two GPU jobs at once** on the 8 GB card (train + serve + another train). Serve falls
    back to CPU when CUDA is full; a training run will just OOM.
 4. **Never train while a corpus build is mid-flight.** `corpora expand --only <lane>` deletes that
@@ -90,20 +124,37 @@ Run from the repo root — the venv python opens `data/` and `weights/` relative
    crashed with `AttributeError: 'SharedPool' object has no attribute 'vram_params'` on a fresh model
    (reproduced). Patch: use `vram_params()` when present, else `n_params()`. Re-check after upstream
    updates.
+2. `serve.py`, web-UI defaults (Ali's call, 2026-10-08): the embedded UI sends `max_new: 2048`
+   (was 400) and the backend default is 2048; `--prime-chars` defaults to **0** (was 1024) - no
+   corpus prime / system-prompt-style context unless asked (`--prime-chars N` re-enables).
+   Re-check after upstream updates.
 
 ## Known upstream warts (cosmetic — do not chase)
 
 1. `corpora all` ends with `!! self-knowledge produced nothing` and a retry hint: stale label — the
    self-knowledge content actually lands in `data/train/chat` (`expand --only chat`); the suggested
    retry just rebuilds the chat text shards.
-2. `serve.py` prints `no corpus to prime from`: `load_prime()` expects `data/train/self-knowledge/`
-   files that the current corpora never writes. Harmless; `--prime-chars 0` silences it.
-3. Benign warnings on this platform: `expandable_segments not supported on this platform`,
-   `PYTORCH_CUDA_ALLOC_CONF is deprecated` (upstream sets the old name), and a requires_grad scalar
-   warning in `minagi/recur.py`.
+2. `serve.py`'s prime is OFF by default since 2026-10-08 (Local patch #2). `data/train/self-knowledge/self-01.txt`
+   (2 turns; volatile counts stripped 2026-10-08) still exists as the 8th training subject and the model has learned it - its
+   samples carry the self-description. With priming on and the dir missing, serve prints
+   `no corpus to prime from`; `corpora` never writes the dir itself - `build_self_knowledge` just
+   regenerates chat. It is hand-curated and therefore force-added to git
+   (tracked despite the `data/` ignore).
+3. Benign warnings on this platform: `expandable_segments not supported on this platform` and a
+   requires_grad scalar warning in the reader. The deprecated `PYTORCH_CUDA_ALLOC_CONF` name was
+   fixed upstream on 2026-10-07 (`d196eb2`/`e6cfda8`).
+4. A hard power loss can leave `weights/optim.npz` truncated (`File is not a zip file`) while
+   everything else survives: the next `--save` run notes `optimiser moments not restored`,
+   starts with fresh Adam moments, and rewrites the file at its first checkpoint — weights
+   are unaffected. Observed 2026-10-06.
 
-## State left behind (2026-10-02)
+## State left behind (2026-10-08)
 
-`weights/` = best state after the verification reads (step 519, 65 experts, 2091.9 MB, pool grew 64→65);
-`data/` complete; `data_*` intermediates kept; no background processes left running. The real run is
-simply the train command above, left alone for days.
+`weights/` = final state after the training runs (**step 134,197, 202 experts - 176 carrying
++ 26 gated, 5,553.1 MB, 643.8M params**; held-out **0.7942** nats after the overnight session -
+1.0107 before it; best subject chess 0.561, worst wikipedia 1.193). Context 3,516 of 4,096;
+`optim.npz` healthy. `data/` complete but still the SAMPLED
+corpus; the extended material waits in `data_stage/` (≈37 GB; wiring pending Ali's approval), and
+`data_chess_char/` has been rebuilt (4M games, 1.95B tokens, 5.5 GB). `data_*` intermediates kept;
+the web UI can stay up via `start.bat`; the real run is simply the train command above, left alone
+for days.
