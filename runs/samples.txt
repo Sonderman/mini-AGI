@@ -239231,3 +239231,3090 @@ prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
 It was the made experts the character asked for most of the onest to buy the onest to buy the onest to the parameters of its pastel disk. Th
 [adapted]  repeated 8-grams 0%
 It was there playing of these, because they would become very bad.: 6happens together and discovery. Every forward - a window I read, a prom
+
+
+##############################################################################
+# session started 2026-10-08 09:58  at step 134,197, 274.8M of 2,647M characters read (10.38%), 202 experts
+##############################################################################
+
+==============================================================================
+step 134,878   276.2M of 2,647M characters (10.44%)   12 min   203 experts
+context 3,524 characters of 4,096   reading 2,326 char/s   writing 26.3 char/s   still gaining -0.0201 deep into it
+grad norm 1.13 against a clip of 1   clipping
+train loss 0.7801   lr 3.00e-04   evidence t +4.21 over 65.1 (effect +0.0935)   rate x1.000
+held-out loss 0.7830 +/-0.0260 nats   1.1297 bits/char   perplexity 2.19   gap +0.0030
+  arithmetic 0.678   chat 0.778   chess 0.549   code 0.851   reasoning 0.787   stories 0.672   wikipedia 1.167
+repeats 26% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 38%
+was there to help his mom and dad. He was very excited to see what was wrong. He was very excited to see what was wrong. He was very sad. He
+[adapted]  repeated 8-grams 43%
+was three.
+
+His mom was very curious. She wanted to play, but she was very curious. She wanted to play, but she was very curious.
+
+One d
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 74%
+                                                                                                          expr tokens in the self. The selfi
+[adapted]  repeated 8-grams 53%
+if a.is_zero:
+    try:
+  , a, b, convert_merge_sort(a, b)
+    if a.is_zero:
+    try:
+  , a, b, convert_merge_sort(a, b)
+    if a.is_zero:
+  
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 56%
+<think> 7+8+0=5c1 9+8+1=8c1 3+3+1=7c0 </think> 7858
+add 3 + 3 = 6
+add 3 + 3 = 6
+add 3 + 3 = 6
+add 3 + 3 = 6
+add 3 + 3 = 6
+add 3 + 3 = 6
+add 3 + 3 = 6
+add
+[adapted]  repeated 8-grams 4%
+<think> 7+8+0=5c1 9+8+1=8c1 3+3+1=7c0 </think> 785
+add 2643109 + 582763 = <think> 9+3+0=2c1 0+6+1=7c0 1+7+0=8c0 3+2+0=5c0 4+8+0=2c1 6+5+1=2c1 2+0+1=3c0 </think> 32258
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is alr
+[adapted]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text islet.
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 2%
+I train the same blo trains all of them at o minutes and trains while I train it. I am assembled from a pool of small experts rather than a 
+[adapted]  repeated 8-grams 0%
+I train, some keys, and the spellings rather than a fixed stack.
+</bot>
+<user>
+How do you work?"I hold a pre-program that sets involved in a spelli
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 16%
+def returns_training_state_array_function_to_state_arrays(state_arrays: int, length: int, length: int) -> None:
+    """
+    Returns the larg
+[adapted]  repeated 8-grams 62%
+def returns_above(ctx, python_size: int, precision: int, precision: int, precision: int, precision: int, precision: int, precision: int, pre
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 52%
+a serial serial series of the serial series, and the serial series and serial series are serial series. The serial series are serial series,
+[adapted]  repeated 8-grams 17%
+then processing:
+```
+# These processing are different, and computes the romanistration between processing areas, which are:
+```
+# These 
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   13 legal moves, then Bxd5
+Nf3 Nc6 3. Bc4 Nf6 4. d3 d6 5. Bg5 Be7 6. Nc3 O-O 7. Bxd5 Nxd5 8. Nxd5 Bxd5 9. Bxd5 Qxd5 10. O-O Bg4 11. h3 Bh5 12. g4 Bg6 13. Nxg6 hxg6 14.
+[adapted]  repeated 8-grams 0%   7 legal moves, then Be7
+Nf3 d6 3. Bc4+ Ke7 4. O-O Nf6 5. d3 Be7 6. Bg5+ Kd8 7. Nc3 h6 8. Bx6+ Ke8 9. Bxf5 g6 10. Be3 Nh5 11. Qd2 Nf4 12. Be2 Nxd3+ 13. cxd3 Bg4 14. 
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, searched reading i
+[adapted]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, searched reading i
+
+==============================================================================
+step 135,564   277.6M of 2,647M characters (10.49%)   24 min   203 experts
+context 3,524 characters of 4,096   reading 2,339 char/s   writing 26.7 char/s
+grad norm 1.13 against a clip of 1   clipping
+train loss 0.7486   lr 3.00e-04   evidence t +4.17 over 65.1 (effect +0.0926)   rate x1.000
+held-out loss 0.7834 +/-0.0251 nats   1.1302 bits/char   perplexity 2.19   gap +0.0348
+  arithmetic 0.677   chat 0.755   chess 0.568   code 0.859   reasoning 0.798   stories 0.672   wikipedia 1.155
+repeats 26% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 10%
+was so excited the boy when he saw a big structure in the sky. He was so excited that he could buy it with the sand shiny structure.
+
+Tom 
+[adapted]  repeated 8-grams 28%
+was flying around the parkly.
+
+Tom was very curious. He wanted to go, but he was very curious.
+
+The boy was very curious. He wanted to g
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 47%
+                # the serial to the string to the sorted parameter and serialize the string to the string to the string to the string to the
+[adapted]  repeated 8-grams 74%
+super().__dict_log(a, b)
+   super().__dict_log(b)
+   super().__dict_log(b)
+   super().__dict_log(b)
+   super().__dict_log(b)
+   super().__di
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 44%
+<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 c1 </think> 1305
+sub 7 - 7 = 0
+sub 7 - 7 = <think> 7-7-0=0b0 </think> 0
+sub 7 - 7 = 0
+sub 7 - 7 = <think> 7-7-0=0b0 </think> 0
+sub 7 - 7 = 0
+
+[adapted]  repeated 8-grams 3%
+<think> 7+8+0=5c1 9+8+1=8c1 7+3+1=1c1 c1 </think> 1285
+sub 746903 - 28174 = <think> 3-4-0=9b1 0-7-1=2b1 9-1-1=7b0 6-8-0=8b1 4-2-1=1b0 7-0-0=7b0 </think> 718729
+add 64
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 17%
+<held>
+>
+def get_subprocess_graph(self) -> str:
+    """
+    Return a subprocess graph where you have a list of the subprocess graph where yo
+[adapted]  repeated 8-grams 8%
+<held>
+<held>
+ <held>
+>><held>
+  !held>
+><held>
+>><held>
+   """"
+</bot>
+<user>
+How do I write a function that gets inforded into a list.
+</user>
+<bot>
+The 
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+ I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is al
+[adapted]  repeated 8-grams 10%
+6c0 characters and everything ft?
+</bot>
+<user>
+How do I write a function that gets information about when I read, and when I read, and whether I rea
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 2%
+def get_supported_default_largest(largest, args, kwargs):
+    """
+    Return a list of largest numbers in a list."""
+    return super().supe
+[adapted]  repeated 8-grams 1%
+def get_python(self):
+    """Returns the largest number into a list."""
+    return self._patch(self)
+</bot>
+<user>
+Implement a function called get_pyt
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 89%
+a subset of the subset of the subset of the subset of the subset of the subset of the subset of the subset of the subset of the subset of th
+[adapted]  repeated 8-grams 28%
+the first party.
+The first party of the subsequence is and therefore,
+The subsequence of the subsequence is always dropenible.
+The subseq
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   1 legal moves, then exe4
+d4 exe4 3. Nc3 d5 4. ex1 Nf6 5. Nf3 Be7 6. Be2 O-O 7. O-O Nc6 8. Be3 Ne5 9. Bd2 Nxf3+ 10. Bxf3 Bg4 11. h3 Bh5 12. Rab1 Bxf3 13. Bxf3 Ned7 14
+[adapted]  repeated 8-grams 0%   1 legal moves, then exc4
+d4 exc4 3. Bc2 d5 4. exp8=10. Bxf7+ Kxf7 11. Ne2 Bd6 12. O-O Nf6 13. Bg5+ Ke8 14. Bxf6+ gxf6 15. Nd2 Be6 16. Ne4 Bxc8 17. Qf3+ Kd7 18. Nxc5+
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 29%
+One character at each depth, and the forward brings on the ones its characters ask for most. Every character at each depth, and the forward 
+[adapted]  repeated 8-grams 2%
+One character at each dept, and the forward brings on the ones its characters. A newcomer that is number than the chunk, and checks everythi
+
+==============================================================================
+step 136,270   279.1M of 2,647M characters (10.54%)   36 min   204 experts
+context 3,526 characters of 4,096   reading 2,408 char/s   writing 21.3 char/s
+grad norm 1.15 against a clip of 1   clipping
+train loss 0.7398   lr 3.00e-04   evidence t +4.13 over 65.2 (effect +0.0917)   rate x1.000
+held-out loss 0.7831 +/-0.0271 nats   1.1298 bits/char   perplexity 2.19   gap +0.0433
+  arithmetic 0.672   chat 0.751   chess 0.557   code 0.863   reasoning 0.792   stories 0.661   wikipedia 1.186
+repeats 30% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 2%
+was three years old and lived in a big tree. He was very strong and strong. He was so excited that he could not find it.
+
+One day, Tom was
+[adapted]  repeated 8-grams 17%
+was three years old. He was very curious.
+
+One day, Tom's friend, Sam. Tom was very hungry. He was very curious.
+
+"Hello, Tom!" he said.
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 99%
+                                                                                                                                            
+[adapted]  repeated 8-grams 59%
+format_sorted(a, b)
+    if a.is_number(a, b):
+    format_sorted(a, b)
+   format_sorted(a, b)
+   format_sorted(a, b)
+   format_sorted(a, b)
+ 
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 53%
+<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 c1 </think> 1305
+add 2 + 2 = 4
+add 2 + 2 = 4
+add 2 + 2 = 4
+add 2 + 2 = 4
+add 2 + 2 = 4
+add 2 + 2 = 4
+add 2 + 2 = 4
+
+[adapted]  repeated 8-grams 3%
+<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 c1 </think> 1305
+add 274869 + 23051 = <think> 9+1+0=0c1 6+5+1=2c1 8+0+1=9c0 4+3+0=7c0 7+2+0=9c0 2+0+0=2c0 </think> 297920
+mul 13
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is alr
+[adapted]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is alr
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 26%
+def is_speed_info(self, *args, **kwargs):
+    """
+    Speed in km (self) + travels (self) + travels (self) + travels (self).
+
+    Examples
+ 
+[adapted]  repeated 8-grams 44%
+def is_complex(v, k):
+    """
+  special complex values.
+
+   finally, the special complex values.
+
+   finally, the special complex values.
+  
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 0%
+def returns():
+    """
+    Returns the returned string in a list.
+
+    Examples
+    ========
+
+    >>> from sympy.core.exprtools import False
+[adapted]  repeated 8-grams 65%
+def returns():
+    """
+   super().__init__()
+    super().__init__()
+    super().__init__()
+    super().__init__()
+    super().__init__()
+   
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 92%
+the set of the set of the set of the set of the set of the set of the set of the set of the set of the set of the set of the set of the set 
+[adapted]  repeated 8-grams 21%
+the first day.
+The first day, the first day, then the subtlack into all pieces of the same row, and they are subtlacked.
+The subtlack into
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   9 legal moves, then Nxe5
+Nf3 Nc6 3. Bc4 Nf6 4. Ng5 Be7 5. Nxf7 Kxf8 6. Nxh8 Nxe5 7. Bxe5 d6 8. Bd4 Be6 9. Bxe6 fxe6 10. Nc3 Nd7 11. Ne4 Nf6 12. Nxf6 gxf6 13. O-O Bg7
+[adapted]  repeated 8-grams 2%   2 legal moves, then ex80+12.
+Nf3 d5 3. ex80+12. c3 d4 2. cxd9=1b6 </think> 1
+sub 2738405 - 296173 = <think> 5-3-0=2b0 0-7-0=3b1 4-1-1=2b0 8-6-0=2b0 3-9-0=4b1 7-2-1=4b0 2-0-0=2b0 </think> 24
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is alr
+[adapted]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is alr
+
+==============================================================================
+step 136,972   280.5M of 2,647M characters (10.60%)   49 min   205 experts
+context 3,530 characters of 4,096   reading 2,395 char/s   writing 21.3 char/s
+grad norm 1.10 against a clip of 1   clipping
+train loss 0.7503   lr 3.00e-04   evidence t +4.07 over 65.2 (effect +0.0905)   rate x1.000
+held-out loss 0.7873 +/-0.0278 nats   1.1359 bits/char   perplexity 2.20   gap +0.0370
+  arithmetic 0.669   chat 0.760   chess 0.543   code 0.856   reasoning 0.797   stories 0.678   wikipedia 1.208
+repeats 31% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 5%
+was very excited to go on a trip to play with his friends. He saw a big tree with lots of friends in the tree. Tom was so excited to take a 
+[adapted]  repeated 8-grams 7%
+was very curious and he was very curious.
+
+Tom decided to give his mom. He wasn't believed to hurt and said, "Let's play with the boy."
+
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 44%
+            return a.copy()
+            else:
+                return a.copy()
+
+        return a.copy()
+
+    def copy(self, expr, return_type
+[adapted]  repeated 8-grams 37%
+super().__name__, ()
+   super().__name__, ()
+<|endoftext|>from sympy.core.symbolic import SYMPI_FUNCTIONS
+from sympy.core.symbolic import SYMPI_FUNCTION
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 60%
+<think> 7+8+0=5c1 1+8+1=0c1 c1 </think> 105
+mul 7 * 7 = 49
+mul 7 * 7 = 49
+mul 7 * 7 = 49
+mul 7 * 7 = 49
+mul 7 * 7 = 49
+mul 7 * 7 = 49
+mul 7 * 7 = 49
+mul 
+[adapted]  repeated 8-grams 1%
+<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 c1 </think> 1305
+mul 7684 * 92 = 708648
+mul 9517 * 26 = 248072
+mul 9651 * 78 = <think> 9651*8=77208 9651*70=674570 77208+
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is alr
+[adapted]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is alr
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 81%
+def train_travels_mapping_mapping_mapping_mapping_mapping_mapping_mapping_mapping_mapping_mapping_mapping_mapping_mapping_mapping_mapping_ma
+[adapted]  repeated 8-grams 32%
+def train_multipart(self, q):
+    """
+  super().__init__() => self.partial().__name__)
+    super().__name__)
+    super().__name__)
+    super
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 14%
+def return_value_product_max(number):
+    """
+    Returns the largest number of products of the largest number in a list.
+    """
+    return
+[adapted]  repeated 8-grams 38%
+def return_validate_module(name, proxy_number):
+    """
+  self.proxy_number = proxy_number
+    self.proxy_number = proxy_number
+    self.pro
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 73%
+a maximum of the server in the server and the server in the server and the server in the server and the server in the server and the server 
+[adapted]  repeated 8-grams 14%
+the first polynomial construindex with any
+ 1980s). The production wasted by the production of these production and methods, by
+The producti
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   1 legal moves, then exc4
+d4 exc4 3. c3 d5 4. exp5 exd4 5. cxd4 Nf6 6. Nc3 Bb4 7. Bd2 Bxc3 8. Bxc3 Nc6 9. Nf3 O-O 10. O-O Rfe8 11. Be3 Nd4 12. Bxd4 exd4 13. Ne2 Be6 1
+[adapted]  repeated 8-grams 0%   2 legal moves, then 3.57849
+d3 d6 3.57849
+ 120678 = newite 20078 = 126496
+ - 7583041= <think> 4+1+0=5c0 4+4+0=8c0 4+2+0=6c0 1+8+0=9c0 2+7+0=9c0 8+7+0=5c1 c1 2+7+1=0c1 c3 2 </think> 
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 2%
+It can read and write one character at a time, because reading anothers and currently over a window that are used its characters asked for, 
+[adapted]  repeated 8-grams 0%
+It can read any text is measured the given axis, out of long, weights ly away. The cost is the ceiling its volume, because it allows the exp
+
+==============================================================================
+step 137,681   282.0M of 2,647M characters (10.65%)   61 min   205 experts
+context 3,533 characters of 4,096   reading 2,419 char/s   writing 21.8 char/s
+grad norm 1.12 against a clip of 1   clipping
+train loss 0.7546   lr 3.00e-04   evidence t +4.05 over 65.2 (effect +0.0900)   rate x1.000
+held-out loss 0.7772 +/-0.0260 nats   1.1213 bits/char   perplexity 2.18   gap +0.0226
+  arithmetic 0.669   chat 0.759   chess 0.565   code 0.860   reasoning 0.781   stories 0.647   wikipedia 1.159
+repeats 43% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 26%
+wanted to play with his friend, Tom. But he wanted to play with it. Tom said, "No, I will help you find the toy. I will help you find the to
+[adapted]  repeated 8-grams 1%
+wanted to play with his friend, Tom.
+<|endoftext|>
+One day, a little boy named Tim went for a walk. He had an idea. The bird wasked him. Tim wanted to
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 65%
+        if a.is_integer and a.is_integer and a.is_integer and a.is_integer
+            else a.is_integer and a.is_integer and a.is_integer a
+[adapted]  repeated 8-grams 74%
+if not, a.is_zero and a.is_zero and a.is_zero:
+    if not, a.is_zero and a.is_zero:
+    if not, a.is_zero:
+    if not, a.is_zero:
+    if not
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 61%
+<think> 7+8+0=5c1 1+8+1=0c1 c1 </think> 105
+mul 5 * 5 = 35
+mul 5 * 5 = 35
+mul 5 * 5 = 35
+mul 5 * 5 = 35
+mul 5 * 5 = 35
+mul 5 * 5 = 35
+mul 5 * 5 = 35
+mul 
+[adapted]  repeated 8-grams 3%
+<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 c1 </think> 1305
+mul 4678 * 92 = 435696
+mul 7081 * 53 = <think> 7081*3=21543 7081*50=354050 21543+354050=379693 </think> 379693
+
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 3%
+5665666633 % 53 = <think> 5*13366=536688 53*3367=53673>53666 536667-536688=38 </think> 38
+sub 53333 - 5 = 53328
+</user>
+
+mul 5 * 5 = 25
+</bot> 0
+<user> 5 == <think> 5*0=0 5*1=
+[adapted]  repeated 8-grams 13%
+56798314 % 2569</think> 2569
+</bot>
+<user>
+What3 87604 91857 - 36279
+4851 </think> 3670
+</bot>
+<user>
+What3 86975 % 401,=39670 > 36574>2683 26739>46518 46517-4630=2 </think> 2
+2
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 74%
+def expand_infossils(self, training, training, training, training, training, training, training, training, training, training, training, tra
+[adapted]  repeated 8-grams 57%
+def train_the(self, training, training, training, training, training, training, training, training, training, text):
+   ''s expanding the sp
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 61%
+def anglest_largest_number_info(self, input, maximum, maximum, maximum, maximum, maximum, maximum, maximum, maximum, maximum, maximum, maxim
+[adapted]  repeated 8-grams 11%
+def anglest_convert_addrs(buf, args, kwargs):
+   """Returns the largest number indicate of the largest number.
+
+   parameters
+   indicates, 
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 90%
+the state of the state of the state of the state of the state of the state of the state of the state of the state of the state of the state 
+[adapted]  repeated 8-grams 46%
+the built-in condition shape. The built-in condition shape will be the
+arguments of the built-in conditions. The built-in condition shape wi
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   4 legal moves, then Bx6
+Nf3 Nc6 3. Bb5 a6 4. Bx6 gxe6 5. O-O Bg7 6. d4 exe4 7. Nxe4 Nxe4 8. Qh5 Qf6 9. Qxh6 Bxh6 10. Nxf6+ Kf8 11. Nxh7+ Ke7 12. Nf6 Bxf6 13. Qxf6+ 
+[adapted]  repeated 8-grams 0%   6 legal moves, then 4.00
+Nf3 d6 2. Bc4 h6 3. O-O Ne7 4.00 Be7 5. d3 Nbc6 6. Be3 O-O 7. Qd2 Nh5 8. Bxg6 fxxg6 9. Qxh6 Nf4 10. Qh5 Nxe2+ 11. Kxe2 Qf6 12. Nd5 Qg6+ 13. 
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 3%
+The attenize whether I am assembled from a pool of every character.
+</bot>
+
+<user>
+How do you work?
+</user>
+<bot>
+I hold a pool of experts rather than a single
+[adapted]  repeated 8-grams 0%
+The attenize whose choices I am this - why I read, a prompt, each character I write - brings a working set of them onto the graphics card: w
+
+==============================================================================
+step 137,681   282.0M of 2,647M characters (10.65%)   64 min   205 experts
+context 3,533 characters of 4,096   writing 21.7 char/s
+grad norm 1.12 against a clip of 1   clipping
+train loss 0.7546   lr 3.00e-04
+held-out loss 0.7850 +/-0.0143 nats   1.1325 bits/char   perplexity 2.19   gap +0.0304
+  arithmetic 0.662   chat 0.736   chess 0.562   code 0.817   reasoning 0.754   stories 0.766   wikipedia 1.198
+repeats 43% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 26%
+wanted to play with his friend, Tom. But he wanted to play with it. Tom said, "No, I will help you find the toy. I will help you find the to
+[adapted]  repeated 8-grams 1%
+wanted to play with his friend, Tom.
+<|endoftext|>
+One day, a little boy named Tim went for a walk. He had an idea. The bird wasked him. Tim wanted to
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 65%
+        if a.is_integer and a.is_integer and a.is_integer and a.is_integer
+            else a.is_integer and a.is_integer and a.is_integer a
+[adapted]  repeated 8-grams 74%
+if not, a.is_zero and a.is_zero and a.is_zero:
+    if not, a.is_zero and a.is_zero:
+    if not, a.is_zero:
+    if not, a.is_zero:
+    if not
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 61%
+<think> 7+8+0=5c1 1+8+1=0c1 c1 </think> 105
+mul 5 * 5 = 35
+mul 5 * 5 = 35
+mul 5 * 5 = 35
+mul 5 * 5 = 35
+mul 5 * 5 = 35
+mul 5 * 5 = 35
+mul 5 * 5 = 35
+mul 
+[adapted]  repeated 8-grams 3%
+<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 c1 </think> 1305
+mul 4678 * 92 = 435696
+mul 7081 * 53 = <think> 7081*3=21543 7081*50=354050 21543+354050=379693 </think> 379693
+
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 3%
+5665666633 % 53 = <think> 5*13366=536688 53*3367=53673>53666 536667-536688=38 </think> 38
+sub 53333 - 5 = 53328
+</user>
+
+mul 5 * 5 = 25
+</bot> 0
+<user> 5 == <think> 5*0=0 5*1=
+[adapted]  repeated 8-grams 13%
+56798314 % 2569</think> 2569
+</bot>
+<user>
+What3 87604 91857 - 36279
+4851 </think> 3670
+</bot>
+<user>
+What3 86975 % 401,=39670 > 36574>2683 26739>46518 46517-4630=2 </think> 2
+2
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 74%
+def expand_infossils(self, training, training, training, training, training, training, training, training, training, training, training, tra
+[adapted]  repeated 8-grams 57%
+def train_the(self, training, training, training, training, training, training, training, training, training, text):
+   ''s expanding the sp
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 61%
+def anglest_largest_number_info(self, input, maximum, maximum, maximum, maximum, maximum, maximum, maximum, maximum, maximum, maximum, maxim
+[adapted]  repeated 8-grams 11%
+def anglest_convert_addrs(buf, args, kwargs):
+   """Returns the largest number indicate of the largest number.
+
+   parameters
+   indicates, 
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 90%
+the state of the state of the state of the state of the state of the state of the state of the state of the state of the state of the state 
+[adapted]  repeated 8-grams 46%
+the built-in condition shape. The built-in condition shape will be the
+arguments of the built-in conditions. The built-in condition shape wi
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   4 legal moves, then Bx6
+Nf3 Nc6 3. Bb5 a6 4. Bx6 gxe6 5. O-O Bg7 6. d4 exe4 7. Nxe4 Nxe4 8. Qh5 Qf6 9. Qxh6 Bxh6 10. Nxf6+ Kf8 11. Nxh7+ Ke7 12. Nf6 Bxf6 13. Qxf6+ 
+[adapted]  repeated 8-grams 0%   6 legal moves, then 4.00
+Nf3 d6 2. Bc4 h6 3. O-O Ne7 4.00 Be7 5. d3 Nbc6 6. Be3 O-O 7. Qd2 Nh5 8. Bxg6 fxxg6 9. Qxh6 Nf4 10. Qh5 Nxe2+ 11. Kxe2 Qf6 12. Nd5 Qg6+ 13. 
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 3%
+The attenize whether I am assembled from a pool of every character.
+</bot>
+
+<user>
+How do you work?
+</user>
+<bot>
+I hold a pool of experts rather than a single
+[adapted]  repeated 8-grams 0%
+The attenize whose choices I am this - why I read, a prompt, each character I write - brings a working set of them onto the graphics card: w
+
+
+##############################################################################
+# session started 2026-10-08 11:25  at step 137,681, 282.0M of 2,647M characters read (10.65%), 205 experts
+##############################################################################
+
+==============================================================================
+step 138,382   283.4M of 2,647M characters (10.71%)   12 min   206 experts
+context 3,535 characters of 4,096   reading 2,393 char/s   writing 20.8 char/s
+grad norm 1.16 against a clip of 1   clipping
+train loss 0.7644   lr 3.00e-04   evidence t +4.01 over 65.2 (effect +0.0891)   rate x1.000
+held-out loss 0.7804 +/-0.0254 nats   1.1259 bits/char   perplexity 2.18   gap +0.0160
+  arithmetic 0.669   chat 0.779   chess 0.541   code 0.861   reasoning 0.802   stories 0.664   wikipedia 1.146
+repeats 39% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 49%
+was very excited and he was very excited. He was very excited and he wanted to see what was inside. He was very excited and he wanted to see
+[adapted]  repeated 8-grams 46%
+was very curious. He wanted to play with his friends, but he was very curious.
+
+He wanted to play with his friends, but he was very curiou
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 99%
+                                                                                                                                            
+[adapted]  repeated 8-grams 23%
+"""
+  starting format.
+
+    This function represents all functions are differently
+    ``function_space``.
+
+    This function represents all
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 74%
+4250
+mul 7 * 7 = 49
+add 7 + 7 = 14
+add 7 + 7 = 14
+add 7 + 7 = 14
+add 7 + 7 = 14
+add 7 + 7 = 14
+add 7 + 7 = 14
+add 7 + 7 = 14
+add 7 + 7 = 14
+
+[adapted]  repeated 8-grams 0%
+4250
+mul 7169 * 85 = 607245
+add 813970 + 452861 = <think> 0+1+0=1c0 7+6+0=3c1 9+8+1=8c1 3+2+1=6c0 1+5+0=6c0 8+4+0=2c1 cmp 7593 < 846715 = yes
+add 
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 37%
+777777777 % 7 = 1
+9
+7 777 + 7 = 7778
+9  7 = <think> 8 7 84 </think> 84
+9
+mul 7 * 7 = 49
+mul 7 * 7 = 59
+mul 7 * 7 = 59
+mul 7 * 7 = 59
+mul 7 * 7 = 59
+mul 7
+[adapted]  repeated 8-grams 7%
+78693 + 517486 charactions I need a character function that 10487 characters alone32 - and then runs the first 2068 characters I am asked1 f
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 8%
+def extravels(context):
+    """
+    Return the extravel matrix to the speed of the context."""
+    return travels(context)
+</bot>
+<user>
+What is the r
+[adapted]  repeated 8-grams 6%
+def x_info(x):
+    """Returns the maximum of x_info(x) and y_info(x).""
+    return x_info(x)
+</bot>
+<user>
+What is 248?
+</user>
+<bot>
+248 </think> 1687
+</bot>
+<user>
+What is 2
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 27%
+def __init__(self, other):
+    """
+    Returns the largest number in a list of a list.
+
+    The returns the largest number in a list of a li
+[adapted]  repeated 8-grams 12%
+def __init_largest(x):
+    """Returns the largest number into a
+
+    Therefore, and then its largest number into a
+   string.
+
+    If ``x``,
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 55%
+a mathematical module that contains the standard module to the module to the module to the module to the module to the module to the module 
+[adapted]  repeated 8-grams 8%
+then computed by and story
+The first line of the computation services and then computes and more
+This would be computationally express the c
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   5 legal moves, then O-O
+Nf3 1... Nc6 3. Bc4 2... Bc5 4. Nc3 3... O-O 5. O-O 4... Nf6 6. d3 5... Be6 7. Bb3 7... a5inee7 8. Rfe1 8... d5 9. exc5 9... Bx7 10. Bg5 10.
+[adapted]  repeated 8-grams 0%   6 legal moves, then Bx
+Nf3 1... Nc6 3. Bb5+ 2... Nge7 4. O-O 2... a6 5. Bx 20... Ng6 6. c3 31... Be7 7. d4 4... cxd4 8. cxa6 5... Nf4 9. Bxc6+ 6... bxc6 10. Nc3 7.
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 4%
+It decide with a gate nexperts I touched most rectangular than a little of each other. A character forward brings onto the character first.l
+[adapted]  repeated 8-grams 15%
+It decide with a gate
+</bot>
+<user>
+How do you work?
+</user>
+<bot>
+I hold at your work?
+</bot>
+<user>
+Help 8 - 1?
+</user>
+<bot>
+I am mini-AGI. I read and write one charamin
+
+==============================================================================
+step 139,068   284.8M of 2,647M characters (10.76%)   25 min   207 experts
+context 3,535 characters of 4,096   reading 2,338 char/s   writing 20.3 char/s
+grad norm 1.12 against a clip of 1   clipping
+train loss 0.7681   lr 3.00e-04   evidence t +3.94 over 65.2 (effect +0.0874)   rate x1.000
+held-out loss 0.7905 +/-0.0271 nats   1.1404 bits/char   perplexity 2.20   gap +0.0224
+  arithmetic 0.660   chat 0.788   chess 0.555   code 0.876   reasoning 0.802   stories 0.671   wikipedia 1.181
+repeats 39% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 27%
+was playing in the park and he saw a big start. He was so excited and he didn't know what to do. He didn't know what to do. He didn't know w
+[adapted]  repeated 8-grams 8%
+was playing in the park. He was very scared.
+
+He was very happy. He didn't know what it was.
+
+But he didn't know. He said, "No, I'm scar
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 99%
+                                                                                                                                            
+[adapted]  repeated 8-grams 28%
+return self._parsed.copy()
+<|endoftext|>import networkx as nx
+from networkx.utils import networkx
+from networkx.utils import networkx_used_parametric
+fr
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 34%
+<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 9+0+1=0c1 4+0+1=5c0 9+0+0=9c0 </think> 950305
+mul 2 * 2 = 4
+mul 2 * 2 = 4
+mul 2 * 2 = 4
+mul 2 * 2 = 4
+mul 2 * 2 = 4
+[adapted]  repeated 8-grams 1%
+<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 4+0+1=5c0 9+0+0=9c0 </think> 95305
+mul 2714 * 68 = 173592
+mul 4086 * 31 = <think> 4086*1=4086 4086*30=122580 4086+122580=
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 6%
+23333333333 </think> 3333338 % 1333 = <think> 33*3444=333322 333222=333346>333332 333322-33332=21 2339 </think> 21
+s25 2 5 </think> 5
+mul 23 * 2 = 46
+mul 2 * 0 = 0
+cmp
+[adapted]  repeated 8-grams 0%
+237916485 + 237194 = <think> 5+4+0=9c0 9+9+0=8c1 3+1+1=5c0 7+1+0=8c0 3+9+0=2c1 7+3+1=1c1 9+2+1=2c1 5+0+1=6c0 </think> atteig I grelo for at leath 31798 c
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 87%
+def expand_speeds_speeds_speeds_speeds_speeds_speeds_speeds_speeds_speeds_speeds_speeds_speeds_speeds_speeds_speeds_speeds_speeds_speeds_spe
+[adapted]  repeated 8-grams 74%
+def corner_specified_specified_specified_specified_specified_specified_specified_specified_specified_specified_specified_spec as np
+   
+):
+
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 29%
+def apply_parameters(self):
+    """
+    Returns the largest number in a list of all largest numbers
+    the largest number in a list of all 
+[adapted]  repeated 8-grams 1%
+def apply_start(self):
+    """Returns the largest number of arguments
+    largest.
+
+    This methods are particular to between parametrics o
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 62%
+a second array of the second array. The second array is a sequence of the second array. The second array is a sequence of the second array. 
+[adapted]  repeated 8-grams 44%
+the first and polynomial defined by
+The starting of the starting of the starting of the
+The starting of the starting of the samples.
+This wo
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   0 legal moves, then Nfd2
+Nfd2 Nc6 3. Bc4 Nf6 4. O-O Bc5 5. d4 ex4 6. Nc3 d5 7. exd5 Nxd5 8. Nxd5 Qxd5 9. Bb3 Be6 10. Bxe6 fxe6 11. Qh5+ g6 12. Qxe5 Qxe5 13. Bxe5 Bd6
+[adapted]  repeated 8-grams 0%   0 legal moves, then Nfd2
+Nfd2 Nc6 3. Bc4 h6 4. O-O Bc5 5. d4 ex4 6. Nc3 Bb6 7. Be2 d5 8. exd5 Nb4 9. Bb3 O-O 10. a3 Nc6 11. Bd5 Nxd5 12. Nxd5 Bxd5 13. c4 Bb6 14. Qf3
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 6%
+2 at each owning output a string of the which tries all of the which experts the string step becoms list. A subject holds means feel ashed. 
+[adapted]  repeated 8-grams 28%
+231 million parametrics of experts on disk for the which experts I touched most arguments arguments arguments arguments arguments and famlin
+
+==============================================================================
+step 139,750   286.2M of 2,647M characters (10.81%)   37 min   208 experts
+context 3,539 characters of 4,096   reading 2,327 char/s   writing 22.8 char/s
+grad norm 1.16 against a clip of 1   clipping
+train loss 0.7408   lr 3.00e-04   evidence t +3.13 over 65.2 (effect +0.0857)   rate x1.000
+held-out loss 0.7913 +/-0.0262 nats   1.1416 bits/char   perplexity 2.21   gap +0.0505
+  arithmetic 0.669   chat 0.796   chess 0.540   code 0.875   reasoning 0.808   stories 0.687   wikipedia 1.165
+repeats 29% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 11%
+was playing in the garden when he saw a big boy with his family. He was sad and angry. He wanted to play with his family and sail to play wi
+[adapted]  repeated 8-grams 53%
+was playing in the garden.
+
+One day, Tom was playing in the garden. He was playing in the garden.
+
+Tom was playing in the garden.
+
+But
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 99%
+                                                                                                                                            
+[adapted]  repeated 8-grams 18%
+"""Returns an iterable of merging sorted arguments if a.
+
+   
+
+Alternatively, positively adjusted by merging sorted arguments if a.positiv
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 22%
+<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 cmp 59 == 55 = no 5 = no
+sub 5 - 5 = 0
+add 59 + 5 = 64
+add 59 + 5 = 64
+add 59 + 5 = 64
+add 5 + 5 = 10
+add 5 
+[adapted]  repeated 8-grams 1%
+<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 4+0+1=5c0 </think> 5305
+sub 2697814 - 536927 = <think> 4-7-0=7b1 1-2-1=8b1 9-6-1=2b0 7-9-0=8b1 9-3-1=5b0 6-5-0=1b0 2-0-0=
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 6%
+1 am mini-A 6-1-1=2b0 1-1-0=9b1 9-1-1=9b1 9-1-1=7b0 solllecombings: is the 256 hits one 2 doc0 is 2  </think> 2 = <think> 22*1=22 22*10=220 2+220=220 </think> 2
+[adapted]  repeated 8-grams 53%
+1 am mini-A 6-1-2=3b0 5-9-0=6b0 sole 8->-0=7b0 sole 8->-0=7b0 sole 8->-0=7b0 sole 8->-0=7b0 sole 8->-0=7b0 sole 8->-0=7b0 sole + 6.
+</bot>
+
+<user> aov
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 28%
+It has a pool of experts exactly on the same travel of travels 60 km in a form I cannot form a travel of travels 60 km in a form I cannot tr
+[adapted]  repeated 8-grams 2%
+Its well-known function are also its weights and becomes travels.
+</bot>
+<user>
+What is the roundleshaking counters of the largest counters in the 
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 13%
+def append(self) -> None:
+    """
+    Returns the largest number in a list of largest numbers in a list.
+    """
+    return self._largest_nu
+[adapted]  repeated 8-grams 53%
+def append(self) -> None:
+   '''
+   self._parse_think = '\x025'
+   self._parse_think = '\x025'
+   self._parse_think = '\x025'
+   self._pars
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 82%
+a constant of the server of the server of the server of the server of the server of the server of the server of the server of the server of 
+[adapted]  repeated 8-grams 56%
+the first part of the same without any characters of the same without any
+The same without any characters of the same without any characters
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   3 legal moves, then ex4
+Nf3 Nc6 3. d4 ex4 4. Nxe5 Nxe5 5. dxe5 dxe5 6. Bc4 Be6 7. O-O Be7 8. Rfe1 O-O 9. Bg5 f6 10. Bh4 Ng6 11. Bg3 Ne5 12. Nxe5 Bxg3 13. hxg3 Qd7 1
+[adapted]  repeated 8-grams 0%   9 legal moves, then ex4
+Nf3 d6 3. Bc4 Nf6 4. Nc3 Be7 5. O-O Nbd7 6. d4 ex4 7. Nxe4 O-O 8. Bg5 h6 9. Bxf6 Bxf6 10. Ng5 Be7 11. Qf3 Ne5 12. Qg3 Nxg4 13. Qxg4 Bf6 14. 
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 2%
+I am mini-A I read, each stretch of held-out has room one thought could become mini-AGI. Am all of them is room on the card goes the ones it
+[adapted]  repeated 8-grams 10%
+It holds the 96 experts I am used. An experts I am used. Every forward - a window I read, a prompt, each character I write - brings uperts t
+
+==============================================================================
+step 140,472   287.7M of 2,647M characters (10.87%)   49 min   208 experts
+context 3,541 characters of 4,096   reading 2,463 char/s   writing 24.4 char/s
+grad norm 1.08 against a clip of 1   clipping
+train loss 0.7546   lr 3.00e-04   evidence t +3.37 over 65.2 (effect +0.0846)   rate x1.000
+held-out loss 0.7834 +/-0.0252 nats   1.1302 bits/char   perplexity 2.19   gap +0.0288
+  arithmetic 0.670   chat 0.797   chess 0.548   code 0.857   reasoning 0.774   stories 0.691   wikipedia 1.146
+repeats 45% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 79%
+was very excited because he was very excited because he was very excited because he was very excited because he was very excited because he 
+[adapted]  repeated 8-grams 45%
+was very happy.
+
+He was very happy, but he was very confused. He wanted to himself, but he was very confused. He wanted to himself, but he
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 78%
+            self._parsed = False
+                self._parsed = False
+                self._parsed = False
+                self._parsed = Fa
+[adapted]  repeated 8-grams 50%
+if not is_leaved:
+    start_dims: list[Leave] = []
+    format_sort: list[Leave] = []
+    format_sort: list[Leave] = []
+    format_sort: list
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 86%
+8305
+add 5 + 5 = 10
+add 5 + 5 = 10
+add 5 + 5 = 10
+add 5 + 5 = 10
+add 5 + 5 = 10
+add 5 + 5 = 10
+add 5 + 5 = 10
+add 5 + 5 = 10
+add 5 + 5 = 10
+
+[adapted]  repeated 8-grams 4%
+5290
+add 613745 + 920861 = <think> 5+1-0=6b0 4-6-0=8b1 7-8-1=8b1 2-3-1=8b1 2-0-1=1b0 6-8-0=8b1 cmp 5 < 93720 ==no
+6 05 = <think> 0-5 5 6.0 </think> 60
+add 1327
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+5 am playing no experts I am and when an expert leaving to the cape, and the wheata is laying one that all of them onto the graphics card: w
+[adapted]  repeated 8-grams 4%
+50 </think> 69137=<think> 8-5+0=3c1 7-9-1=7b1 3-0-1=2b0 9-6-0=3b0 1-5-0=6b1 9-2-1=6b0 </think> 663273
+aub 584901 - 27653 = <think> 1-3-0=8b1 0-5-1=4b1 9-6-1=2b0 4-7-0
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 13%
+definitely a manual value of the array is also a training state of a single state of a single state, and the bond rate is not a copy rather 
+[adapted]  repeated 8-grams 43%
+define the given set of the absolute vals of the absolute vals of the absolute vals of the original expression based on the original express
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 77%
+def largest_numpy(self, largest_largest_largest_largest_largest_largest_largest_largest_largest_largest_largest_largest_largest_largest_larg
+[adapted]  repeated 8-grams 62%
+def largest_numpy(self, arguments, kwargs=None, **kwargs=None, **kwargs=None, **kwargs=None, **kwargs=None, **kwargs=None, **kwargs=None, **
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 72%
+a manifest of the statistic string in the statistic string in the statistic string in the statistic string in the statistic string in the st
+[adapted]  repeated 8-grams 47%
+the largest position (1), which may be the
+
+The first language is the largest position (1), which may be the largest position (1), which ma
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 2%   0 legal moves, then Nfd2
+Nfd2 Nc6 3. Bb5 Bd7 4. O-O a6 5. Ba4 b5 6. Bb3 O-O 7. c3 Nge7 8. Bg5 f6 9. Be3 Nd5 10. Ne4 Nxf4 11. Bxf4 Bxf4 12. Nxf4 Nxf4 13. Bxf4 Bxb2 14
+[adapted]  repeated 8-grams 0%   0 legal moves, then Nfd2
+Nfd2 Nc6 3. Bb5 a6 4. Bxc6+ bxc6 5. O-O Be7 6. Rfe1 O-O 7. c3 Ne7 8. Bg5 f6 9. Bh4 Ng6 10. Bg3 Qe8 11. Nb3 Bd7 12. Qc2 Nf4 13. Bxf7+ Kxf7 14
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+50 milll 0 is less through the experts to use the given argungens to the answer. Every forward - a window I read, a prompt, each character I
+[adapted]  repeated 8-grams 3%
+50 milll 691 = <think> 691*0=0 61*1=71>620 620-0+620=41 </think> 41
+add 5392768 + 103549 = <think> 8+9+0=7c1 6+4+1=1c1 7+5+1=3c1 2+3+1=6c0 9+0+0=9c0 3+1+0=4c0 
+
+==============================================================================
+step 141,200   289.2M of 2,647M characters (10.93%)   61 min   209 experts
+context 3,541 characters of 4,096   reading 2,484 char/s   writing 24.3 char/s
+grad norm 1.13 against a clip of 1   clipping
+train loss 0.7465   lr 3.00e-04   evidence t +3.56 over 65.3 (effect +0.0836)   rate x1.000
+held-out loss 0.7834 +/-0.0251 nats   1.1302 bits/char   perplexity 2.19   gap +0.0369
+  arithmetic 0.674   chat 0.780   chess 0.556   code 0.868   reasoning 0.772   stories 0.685   wikipedia 1.150
+repeats 37% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 29%
+was walking through the boy nearby. He wanted to go on a beach and see what was doing the beach. He wanted to go on a beach and see what was
+[adapted]  repeated 8-grams 8%
+was flutting one day.
+
+He was flutting down at his bed, but he couldn't find his bed. He wanted to go fast, but he didn't know.
+
+He said
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 83%
+                a = b.sead(b)
+                    a = b.sead(b)
+                    a = b.sead(b)
+                    a = b.sead(b)
+        
+[adapted]  repeated 8-grams 61%
+support_merge_sorted = [
+   1,
+  torch._C._C._C._C,
+    torch._C._C._C,
+    torch._C._C._C,
+    torch._C._C._C,
+    torch._C._C._C,
+    torc
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 47%
+<think> 7+8+0=5c1 1+8+1=0c1 3+3+1=7c0 8+0+0=8c0 </think> 8705
+add 22 + 2 = 24
+add 22 + 2 = 24
+add 22 + 2 = 24
+add 22 + 2 = 24
+add 22 + 2 = 24
+add 22 + 2 
+[adapted]  repeated 8-grams 2%
+<think> 7+8+0=5c1 2+8+1=1c1 3+3+1=7c0 9+0+0=9c0 </think> 9715
+add 2638475 + 910263 = <think> 5+3+0=8c0 7+6+0=3c1 4+2+1=7c0 8+0+0=8c0 3+1+0=4c0 6+9+0=5c1 2+0+1=
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 12%
+2666666663 % 72 ==22
+1 112 1 1 1 1 1 1 1 1 1 1 1 </think> 11
+cmp 22 > 22 = nulump 22 == <think> let1 22 vs 2 digit 0 2 vs 2 </think> nemb0 </think> 20
+sub 22 - 2 = 20
+
+[adapted]  repeated 8-grams 4%
+261398547 % 263 = <think> 23*14758=263496 23*14759=263584>26358 26358-263496=10 </think> 10
+mul 7285 * 43 = <think> 7285*3=21855 7285*40=291400 21855+291400=31
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 60%
+I am minute delicate between distribute and its first delicate between distribute and its first delicate between distribute and its first de
+[adapted]  repeated 8-grams 9%
+It how do you have?
+</bot>
+<user>
+I need a10069 % 257864=<think> 25738*1069=253784 + 25380=253964 </think> 25394
+</bot>
+</user>
+<bot>
+   100628=35498 - 37612
+</bot>
+<user>
+In alen's
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 9%
+def return_module(self):
+    """
+    Return the return of the largest number in a list.
+    """
+    return self._return_module
+</bot>
+
+<user>
+Can your
+[adapted]  repeated 8-grams 9%
+def rotation_largest_number is not None:
+   
+</bot>
+<user>
+Crease awarengist number of characters in the list.
+</user>
+<bot>
+The list of characters in the
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 83%
+in the set of a string of a string of a string of a string of a string of a string of a string of a string of a string of a string of a stri
+[adapted]  repeated 8-grams 33%
+the first position and the first position and the first
+ position and complex is at least known point.
+
+The first position are defined by 
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 2%   3 legal moves, then ex
+Nf3 Nc6 3. d4 ex 2. dx=N 4 > 2. Nc3 Nf6 3. Bg5 Be7 4. e5 Nd5 5. Nxd5 exd5 6. Bxf6 Bxf6 7. Nxd5 Bxd5 8. Bxd5 Nxd5 9. Qxd5 Bxd5 10. Bxd5 Qxd5 
+[adapted]  repeated 8-grams 0%   10 legal moves, then Bx4
+Nf3 d6 3. Bc4 Nf6 4. d3 Be7 5. O-O Nc6 6. Bg5 h6 7. Bx4 g5 8. Bxf6 Nxf6 9. e5 dxe5 10. Nxe5 Bd6 11. Nxf7 Kxf7 12. Nxd6+ cxd6 13. Bxd6+ Kg8 1
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 7%
+I am mini-A I read and write - away that expert deep into the weighted depth and the trunk left hold depth and the first 2 blue game. The ch
+[adapted]  repeated 8-grams 0%
+I amplify when the ones, the mumacluosed away from its perf.
+</bot>
+
+<user>
+What is the most perfect durangement of all ones?
+</user>
+<bot>
+It holds the 
+
+==============================================================================
+step 141,910   290.6M of 2,647M characters (10.98%)   73 min   210 experts
+context 3,545 characters of 4,096   reading 2,421 char/s   writing 22.2 char/s
+grad norm 1.17 against a clip of 1   clipping
+train loss 0.7680   lr 3.00e-04   evidence t +3.73 over 65.3 (effect +0.0829)   rate x1.000
+held-out loss 0.7778 +/-0.0258 nats   1.1222 bits/char   perplexity 2.18   gap +0.0098
+  arithmetic 0.683   chat 0.767   chess 0.544   code 0.864   reasoning 0.772   stories 0.664   wikipedia 1.149
+repeats 47% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 2%
+was walking in the park with his mom. He was so happy that he could find a special surprise. 
+
+Tom was so excited to see the surprise she 
+[adapted]  repeated 8-grams 12%
+was torn. He was very hungry.
+
+Tom was very happy. He wanted to go inside. He was very happy.
+<|endoftext|>
+Once upon a time, there was a little gir
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 74%
+                a, b = b, a
+                    a, b = a, a
+                    a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, 
+[adapted]  repeated 8-grams 21%
+super().__init__(self, a)
+    return self._api.super()
+
+def _convert_args(
+    a,
+):
+   super().__init_args(
+    a,
+):
+    """
+  super().__i
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 27%
+<think> 7+8+0=5c1 7+8+1=6c1 1+3+1=5c0 9+0+0=9c0 </think> 9565
+add 92 + 9 = 101
+add 92 + 9 = 101
+sub 92 - 9 = 81
+sub 92 - 9 = 83
+sub 92 - 9 = 83
+sub 92 - 
+[adapted]  repeated 8-grams 3%
+<think> 7+8+0=5c1 7+8+1=6c1 9+3+1=3c1 7+0+1=8c0 </think> 8355
+sub 927460 - 813295 = <think> 0-5-0=5b1 6-9-1=6b1 2-4-1=7b1 3-7-1=5b1 2-1-1=0b0 9-8-0=1b0 </think> 15765
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 82%
+99999999399999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999 999999 11100 1
+[adapted]  repeated 8-grams 3%
+901768532 % 491
+8025 736491 % 82 = <think> 82*10976=734528 82*1097=73564>73648 73448-73452=16 </think> 16
+mul 9027 * 85 = <think> 9027*5=45135 9027*80=722160 4
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 97%
+60099999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999
+[adapted]  repeated 8-grams 2%
+6019873254 % 92 </think> p831476
+</bot>
+<user>
+What is the radius content?
+</user>
+<bot>
+In the word characters I write - brings a word number n, n-197804 character
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 70%
+def returns_true(self, largest_list, largest_list, largest_list, largest_list, largest_list, largest_list, largest_list, largest_list, and l
+[adapted]  repeated 8-grams 20%
+def returns_alignment(self, round):
+    """
+  
+
+   marks, alignment (self._round) and (round).
+  (marks, alignment)
+  (marks, alignment)
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 68%
+a constant string of the series of the series of the series of the series of the series of the series, and the series of the series of the s
+[adapted]  repeated 8-grams 49%
+an American American American Amendment Order 2001 (S.S.I. 2001/Amendment)
+The British Amendment Order 2001 (S.S.I. 2001/Amendment)
+The Br
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   19 legal moves, then Ne5
+Nf3 Nc6 3. Bc4 Nf6 4. Nc3 Bc5 5. d3 d6 6. Be3 Bb6 7. Bb3 Be6 8. a4 a5 9. Ba2 Ba7 10. Nd5 Nxd5 11. exd5 Ne5 12. Ne4 Nxe4 13. Bxe4 Bxe4 14. Ne
+[adapted]  repeated 8-grams 0%   4 legal moves, then exd
+Nf3 d6 3. Bc4 Nf6 4. exd Nxd5 5. Bb3 Nxc3 6. bxc3 Be7 7. O-O Bf6 8. Rfe1+ Ne7 9. Ba3 O-O 10. Rab1 Nd5 11. Bc5 Nxc3 12. Rxe7 Qxe7 13. Bd5 Nf6
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 1%
+9 am mini-276 </think> 866
+</bot>
+
+<user>
+What is the rate of a small variable?
+</user>
+<bot>
+I am mini-AGI. I read and write one character at a time. My alphabet
+[adapted]  repeated 8-grams 2%
+930564782 ch31947 characters at the depths that is load. Every forward - a window I read, a prompt, each character I write - brings a workin
+
+==============================================================================
+step 142,616   292.1M of 2,647M characters (11.04%)   85 min   210 experts
+context 3,547 characters of 4,096   reading 2,404 char/s   writing 27.4 char/s   still gaining -0.1344 deep into it
+grad norm 1.13 against a clip of 1   clipping
+train loss 0.7390   lr 3.00e-04   evidence t +3.68 over 65.3 (effect +0.0818)   rate x1.000
+held-out loss 0.7818 +/-0.0267 nats   1.1279 bits/char   perplexity 2.19   gap +0.0429
+  arithmetic 0.666   chat 0.781   chess 0.536   code 0.861   reasoning 0.781   stories 0.674   wikipedia 1.174
+repeats 41% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 21%
+decided to go for a walk in the park. He saw a big box walk in the park. Tom was so happy and he said it was a big park. He said it was a bi
+[adapted]  repeated 8-grams 32%
+decided to go.
+
+One day, his mom asked him, "What's wrong?"
+
+Tom said, "I'm sorry, Mom."
+
+Tom said, "I'm sorry, Mom."
+
+Tom said, "I'
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 99%
+                                                                                                                                            
+[adapted]  repeated 8-grams 19%
+"""
+   matches to provide any functions are provided.
+
+    This can
+   matches the provided function are provided.
+
+    :particularly, set `
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 73%
+5996
+add 56 + 5 = 61
+add 56 + 5 = 61
+add 566 + 5 = 571
+add 566 + 5 = 571
+add 56 + 5 = 61
+add 56 + 5 = 61
+add 56 + 5 = 61
+add 56 + 5 = 61
+add
+[adapted]  repeated 8-grams 0%
+5906
+add 7124536 + 980172 = 8104608
+add 5937261 + 458907 = 6396168
+add 5427019 + 5386472 = 10803591
+add 764258 + 931067 = 1693455
+add 782016
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 36%
+5 def you(n,7 depth, n):
+    """Return the number of nones in the number of nones in the number of nones in the machirecation part of nones 
+[adapted]  repeated 8-grams 0%
+567981324 % 5679e=1068 567%1068=239 1068%239=179 239%179=50 179%50=49 50%49=1 49%1=0 </think> 2
+addd 768315 + 492067 = 8163382
+add 5947160 + 582397
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 65%
+def parse(self, name: str, value: str, value: str = "name", value: str = "name", value: str = "name", value: str = "name", value: str = "nam
+[adapted]  repeated 8-grams 3%
+It can be fully ask for him. My adjacent bounds are always present. It's always precisely and how many parts of which experts are.
+</bot>
+<user>
+Ho
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 3%
+def returns(true: true) -> true:
+    """Return true if true is a list."""
+    return true
+</bot>
+
+<user>
+Write a function that convert to a converted 
+[adapted]  repeated 8-grams 0%
+def returns(the: int, value: int) -> bool:
+    """Returns the largest number in alias.""
+    return value.sqrt()
+</bot>
+<user>
+In theory, convert a li
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 69%
+a set of the first part of the first part of the first part of the first part. The first part is the first part of the first part of the fir
+[adapted]  repeated 8-grams 23%
+the first position algebraic position (empty subsequence).
+This format contains algebraic possible format (empty subsequence). This format c
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   22 legal moves, then Qxd5
+Nf3 Nc6 3. Bc4 Bc5 4. Nc3 Nf6 5. O-O O-O 6. a3 a5 7. Ba2 d6 8. d3 Be6 9. Be3 Nd4 10. Nxd4 Bxd4 11. Nd5 Bxd5 12. Bxd5 Nxd5 13. Qxd5 Be6 14. Q
+[adapted]  repeated 8-grams 0%   4 legal moves, then Bx6
+Nf3 Nc6 3. Bb5 a6 4. Bx6 b5 5. Bxc6+ dxc6 6. Nxe5 Bb7 7. O-O Bxe4 8. Rfe1 Bxg2 9. Kxg2 O-O 10. Nc3 Qd6+ 11. Kg1 Rad8 22. Qe1 Rfe8 23. Qg3 Nd
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is alr
+[adapted]  repeated 8-grams 0%
+It holds a pool when I am still pred characters and used them on the training stage, and the them startlness of held-out amplications I am u
+
+==============================================================================
+step 143,332   293.5M of 2,647M characters (11.09%)   97 min   211 experts
+context 3,547 characters of 4,096   reading 2,441 char/s   writing 27.0 char/s
+grad norm 1.10 against a clip of 1   clipping
+train loss 0.7558   lr 3.00e-04   evidence t +3.65 over 65.3 (effect +0.0812)   rate x1.000
+held-out loss 0.7763 +/-0.0257 nats   1.1200 bits/char   perplexity 2.17   gap +0.0205
+  arithmetic 0.660   chat 0.753   chess 0.550   code 0.861   reasoning 0.789   stories 0.667   wikipedia 1.155
+repeats 30% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 38%
+went to the park with his friends. He wanted to test the boy to the park to the park. He wanted to test the boy to test the boy. He wanted t
+[adapted]  repeated 8-grams 23%
+was three years old. He wanted to go forward.
+
+He wanted to go forward. He started to get some fun. He was hurt.
+
+Tom wanted to get some
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 60%
+            return a.__new__(b, a, b)
+                return a.__new__(b, a, b)
+
+            return a.__new__(b, a, b)
+
+        def __iter__
+[adapted]  repeated 8-grams 84%
+if not_sequence:
+    if not_sequence:
+    if not_sequence:
+    if not_sequence:
+    if not_sequence:
+    if not_sequence:
+    if not_sequenc
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 31%
+<think> 7+8+0=5c1 7+8+1=6c1 9+3+1=3c1 c1 </think> 1365
+add 80 + 5 = 85
+sub 80 - 5 = 75
+add 8 + 5 = 13
+add 8 + 5 = 13
+add 8 + 5 = 13
+add 8 + 5 = 13
+add 8 
+[adapted]  repeated 8-grams 3%
+<think> 7+8+0=5c1 7+8+1=6c1 9+3+1=3c1 c1 </think> 1365
+add 8072946 + 531807 = <think> 6+7+0=3c1 4+0+1=5c0 9+8+0=7c1 2+1+1=4c0 7+3+0=0c1 0+5+1=6c0 8+0+0=8c0 </think> 8
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+8 ae3 expert month of the optimiserable back down to each in turney with a small text has not on the card - while it has room, a none matter
+[adapted]  repeated 8-grams 6%
+869735421 + 809367 = <think> 1+7+0=8c0 2+6+0=8c0 4+3+0=7c0 9+9+0=8c1 7+0+1=8c0 9+9+0=8c1 6+0+1=7c0 </think> 7t3, a 852439
+antextext 0 flo76 </think> 0
+a248395 -
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+It holds the whole expert the current forward - a window I read, a prompt, each character I would use my working scores at those that did. W
+[adapted]  repeated 8-grams 14%
+Its weights are applied again. When I writt, each km-window II read, each km-window II read, appending stops. Allahe index afterwards the wi
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 92%
+def apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_apply_appl
+[adapted]  repeated 8-grams 18%
+def apply_one(self, number):
+    """Returns the largest number in a list.
+
+    Thereforms the largest number indicates of the number indicat
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 49%
+the first array of the first array that will be added to the first array that in the first array that incluse the first array that incluse t
+[adapted]  repeated 8-grams 67%
+the first position and the first position algebraic (when the first position algebraic (when the first position algebraic (when the first po
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   11 legal moves, then Be6
+Nf3 Nc6 3. Bc4 Nf6 4. d3 Be7 5. Bg5 O-O 6. c3 h6 7. Bh4 Be6 8. Bb3 Bxb3 9. axb3 a6 10. O-O b5 11. Bb3 Ne7 12. Nbd2 c5 13. dxc5 b4 14. c4 bxc
+[adapted]  repeated 8-grams 0%   9 legal moves, then Be7
+Nf3 d6 3. Bc4+ Be7 4. Bxe6 fxe6 5. d3 Nf6 6. O-O Be7 7. c3 O-O 8. d4 exd4 9. cxd4 Nbd7 10. e5 dxe5 11. dxe5 Nxe5 12. Nc3 Bf6 13. Qe2 Nxf3+ 1
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 1%
+One character card with experts to hold those that decides whether I had and would use me and a tried expert goes together. When those two m
+[adapted]  repeated 8-grams 13%
+One character card with experts and on those the ones its characters -away part of weights going ones its characters and moments acked once,
+
+==============================================================================
+step 144,035   295.0M of 2,647M characters (11.14%)   109 min   212 experts
+context 3,547 characters of 4,096   reading 2,399 char/s   writing 29.1 char/s
+grad norm 1.34 against a clip of 1   clipping
+train loss 0.7945   lr 3.00e-04   evidence t +3.61 over 65.3 (effect +0.0802)   rate x1.000
+held-out loss 0.7802 +/-0.0248 nats   1.1256 bits/char   perplexity 2.18   gap -0.0143
+  arithmetic 0.668   chat 0.770   chess 0.553   code 0.863   reasoning 0.781   stories 0.684   wikipedia 1.141
+repeats 40% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 25%
+was three years old and he was always curious. He was so happy to see his friends and he was so happy to see his friends again. 
+
+Tom was 
+[adapted]  repeated 8-grams 16%
+was three years old. He was three years old, but he was too far.
+
+The little boy was very happy. He was holding the boy, and he was too fa
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 38%
+            return a.__new__(contains, a, b)
+            elif a < b or a.__new__ == "__new__":
+                return a.__new__(contains, a,
+[adapted]  repeated 8-grams 71%
+"""
+  try:
+   standard_computes = {}
+   try:
+   standard_computes = {}
+   try:
+   standard_computes = {}
+   try:
+   standard_computes = {}
+ 
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 63%
+52065
+add 111 + 1 = 112
+add 111 + 1 = 112
+add 111 + 1 = 112
+add 111 + 1 = 112
+add 111 + 1 = 112
+mul 1 * 1 = 1
+mul 1 * 1 = 1
+add 111 + 1 = 11
+[adapted]  repeated 8-grams 0%
+5206
+add 1493270 + 1548629 = 3041909
+add 275143 + 806291 = <think> 3+1+0=4c0 4+9+0=3c1 1+2+1=4c0 5+6+0=1c1 7+0+1=8c0 2+8+0=0c1 c1 </think> 1081434
+add 29
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 50%
+1111111111 111111 = 1111111
+111 11 + 1 = 122
+add 111 + 1 = 113
+addd 111 + 1 = 112
+add 111 + 1 = 112
+add 111 + 1 = 112
+add 111 + 1 = 112
+add 
+[adapted]  repeated 8-grams 6%
+103987642 </think> 1023249
+8 15736409 % 15 = <think> 15*23049=153627 15*23050=153640>153640 153640-153627=13 </think> 1
+mule924 * 10 = <think> 13244*0=0 13244*10=1324
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 94%
+def set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_set_
+[adapted]  repeated 8-grams 0%
+def speed into keys?
+</bot>
+<user>
+What is the most carefully that IOEDIRECT is an expression that computes informative consumption are:
+</user>
+<bot>
+The
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 15%
+def reset_largest_number(self):
+    """
+    Represents the largest number in a list of numbers in a list of numbers.
+    """
+    return self
+[adapted]  repeated 8-grams 52%
+def probability(self):
+    """
+   ,self.probability(self)
+    """
+   ,self.probability(self)
+    return self.probability(self.probability(se
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 71%
+the sample of the standard deviation of the sample of the standard deviation of the standard deviation of the sample of the standard deviati
+[adapted]  repeated 8-grams 32%
+the following probability:
+
+  ``sympy.stats.core.number`` is an implementation of ``sympy.stats.core.number`` is an implementation
+  calls.
+
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   11 legal moves, then Be7
+Nf3 Nc6 3. Bc4 Bc5 4. O-O Nf6 5. Nc3 O-O 6. d3 d6 7. Bg5 Be7 8. Bxf6 Bxf6 9. Nd5 Bxd4 10. exd4 Nxd4 11. Qxd4 Qf6 12. Qxf6 gxf6 13. Bxd4 Bxd4
+[adapted]  repeated 8-grams 0%   5 legal moves, then O-O
+Nf3 d6 3. Bc4+ Be7 4. Nc3 O-O 5. d3 Nc6 6. Bg5 h6 7. Bxf6 Bxf3 8. Bxe7 Qxe7 9. Nd5 Qg5 10. Nxf6+ Qxf7 11. Qe2 Bg4 12. O-O-O Rae8 13. Qf2 Bxf
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 2%
+One text expert a small toward I read, a prompt and the trust asked for, the one asked for lost again share of stacked once, and a writer fo
+[adapted]  repeated 8-grams 0%
+One character at a special of experts, and I read it. Every forward - a window I read, a prompting steple applied repeats the answer. That i
+
+==============================================================================
+step 144,728   296.4M of 2,647M characters (11.20%)   121 min   213 experts
+context 3,547 characters of 4,096   reading 2,365 char/s   writing 31.0 char/s
+grad norm 1.10 against a clip of 1   clipping
+train loss 0.7551   lr 3.00e-04   evidence t +3.59 over 65.3 (effect +0.0797)   rate x1.000
+held-out loss 0.7736 +/-0.0258 nats   1.1160 bits/char   perplexity 2.17   gap +0.0184
+  arithmetic 0.662   chat 0.751   chess 0.547   code 0.837   reasoning 0.787   stories 0.673   wikipedia 1.157
+repeats 38% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 11%
+was three years old and he loved to play with his toys. One day, he saw a big tree with a big tree. The tree was very happy. The tree was ve
+[adapted]  repeated 8-grams 2%
+was three years old.
+
+One day, Tom was playing with her. He saw another boy, and Tom was very happy. He wanted to share and be fun.
+
+Tom
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 95%
+                                                                                                                                       N    
+[adapted]  repeated 8-grams 7%
+"""Computers for any complex distributions.
+
+    Parameters
+    -----local_format_display(n, distributions)
+    """
+   ,start_display_format
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 58%
+5900
+ 5 7 vs 7 ente 8 = <think> 7 7 14 </think> 14
+add 7 + 7 = 14
+add 7 + 7 = 14
+add 7 + 7 = 14
+add 7 + 7 = 14
+add 7 + 7 = 14
+add 7 + 7 = 14
+add 7 + 7 = 
+[adapted]  repeated 8-grams 0%
+5900
+ 56427318 - 964573 = -4012986
+add 753409 + 862175 = <think> 9+5+0=4c1 0+7+1=8c0 4+1+0=5c0 3+2+0=5c0 5+6+0=1c1 c1 </think> 115584
+add 793620 + 485739
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 19%
+7 at each of them one run is also an expert I have a tured expert myself that is also an expert I have a ture, and a pron at the answer.
+</bot>
+
+
+[adapted]  repeated 8-grams 0%
+796831 % 427?
+9860 fossile of the parameters of experts on disk902, and read up to 248139 for the are in the forward passes 9368207 and 1325
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 61%
+def match_kml(self, kml):
+    """
+    Return the kml kml kml kml kml kml kml kml kml kml kml kml kml kml kml kml kml kml kml kml kml kml kml
+[adapted]  repeated 8-grams 24%
+def g(s):
+    """Computes the number of travels of the kmon at which travels of the
+   ,"""
+   format_kmon = "Computes the number of travels
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 34%
+def apply_largest_number(s):
+    """
+    Returns the largest number in a list of largest numbers in a list of largest numbers in a list of l
+[adapted]  repeated 8-grams 2%
+def apply_number(s):
+    """Convert and returns the largest number in a list.
+
+    Parameters
+    -----list.
+    """
+  , returns _label_numb
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 65%
+a formatter of the following algorithm is a formatter of the formatter of the formatter of the formatter of the formatter of the formatter o
+[adapted]  repeated 8-grams 67%
+the following parts,
+   defaults, order_path, order_path, order_path, order_path, order_path, order_path, order_path, order_path, order_path
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   10 legal moves, then exe5
+Nf3 Nc6 3. Bc4 Nf6 4. Nc3 Be7 5. O-O O-O 6. d3 d5 7. exe5 Nx4 8. Nxe4 dxe4 9. Ne5 Nxe5 10. dxe5 Bh4 11. Be3 Bxe3 12. fxe3 Qh4 13. Qf3 Qh5 14
+[adapted]  repeated 8-grams 0%   2 legal moves, then Bc4+17.
+Nf3 d6 3. Bc4+17. Kf1 48. Ne5 39... Bx6 50. Nd3 10... O-O 6. Be3 11... Nh5 17. Bxc5 12... dxc5 18. Ne4g5 13... h6 19. Ne3g5f6 24. Nxf5 20...
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+One character at a random point in its slot goes most are chosen as I raise myselled repeats: what matters is thought it was there room on t
+[adapted]  repeated 8-grams 2%
+One character at a readIterator.
+</bot>
+<user>
+How do I write a function that replact modules the first particular decode
+</user>
+<bot>
+def get_particular_decod
+
+==============================================================================
+step 145,484   298.0M of 2,647M characters (11.26%)   132 min   213 experts
+context 3,547 characters of 4,096   reading 2,580 char/s   writing 29.6 char/s
+grad norm 1.06 against a clip of 1   clipping
+train loss 0.7531   lr 3.00e-04   evidence t +3.57 over 65.3 (effect +0.0792)   rate x1.000
+held-out loss 0.7726 +/-0.0263 nats   1.1147 bits/char   perplexity 2.17   gap +0.0196
+  arithmetic 0.666   chat 0.754   chess 0.553   code 0.846   reasoning 0.770   stories 0.650   wikipedia 1.169
+repeats 42% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 38%
+decided to go for a walk to play with his friends. He was very excited to go for a walk to play with his friends. He was very happy to hear 
+[adapted]  repeated 8-grams 32%
+was very curious.
+
+Tom wanted to go find, so he was very curious.
+
+The boy was very happy. He wanted to go, but he was very curious.
+
+
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 99%
+                                                                                                                                            
+[adapted]  repeated 8-grams 50%
+if73, removed_stack = (1,2)**3.01 - (1/4)=0.5, b=1.
+   if84, removed_stack=1.
+   if84, removed_stack=1.
+   if84, removed_stack=1.
+   if8
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 42%
+<think> 7+8+0=5c1 9+8+1=8c1 1+3+1=5c0 </think> 585
+add 8811 + 8 = 8819
+mul 8 * 8 = 64
+mul 8 * 8 = 64
+mul 8 * 8 = 64
+mul 8 * 8 = 64
+mul 8 * 8 = 64
+mul 8 *
+[adapted]  repeated 8-grams 6%
+<think> 7+8+0=5c1 9+8+1=8c1 2+3+1=6c0 </think> 685
+mul 7943 * 81 = <think> 7943*1=7943 7943*80=635440 7943+635440=625883 </think> 625883
+add 719042 + 635817 = <think> 2+7+0
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphablo is the 256 byte values plus 9 markers for structure, so any text is alr
+[adapted]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphablo is the 256 byte values plus 9 markers for structure, so any text is alr
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 27%
+Every forward - a window I read, a prompt, each character I write - brings a window I read, a prompt, each character adds started to the gat
+[adapted]  repeated 8-grams 1%
+Every forward - and yously?
+</bot>
+<user>
+What is there?
+</user>
+<bot>
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 exp
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 88%
+def return_trip_return_trip_return_trip_return_trip_return_trip_return_trip_return_trip_return_trip_return_trip_return_trip_return_trip_retu
+[adapted]  repeated 8-grams 8%
+def replace_rotation(self, rotating_rotation):
+    """Returns the largest number of attention characters.
+    """
+   10, self.rotating_rotat
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 74%
+the same as the start of the start of the end of the start of the end of the start of the end of the end of the end of the end of the end of
+[adapted]  repeated 8-grams 0%
+then romanding themselfor the particle.
+This means that for each step, we can't modifying the romands by their positions.
+
+But when addin
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   3 legal moves, then Bd7
+Nf3 Nc6 3. Bb5 Bd7 4. O-O Nge7 5. Nc3 O-O 6. d3 Nd4 7. Nxd4 exd4 8. Nd5 Nxd5 9. exd5 Ne5 10. Bf4 Nxf3+ 11. Qxf3 Be6 12. Bxd4 Bxd4 13. Qxd4 Q
+[adapted]  repeated 8-grams 0%   6 legal moves, then exd5
+Nf3 d6 3. Bc4 h6 4. O-O Nf6 5. exd5 Nxd5 6. Nc3 Be7 7. d4 O-O 8. Bg5 hxg5 9. Nxg5 Nf6 10. Bxf6 Bxf6 11. Ne4 Bg5 12. Qf3 Nd7 13. Rae1 Qd7 14.
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 9%
+200 experts I am assembled from a random fixed stack, and a new fixed stack, and lears a window fixed logical and then reads asked forstring
+[adapted]  repeated 8-grams 0%
+2048 characters. The argumbning stops are applied repeating myself by everything and those reads them onto the graphics card: what I read?
+
+
+==============================================================================
+step 146,189   299.4M of 2,647M characters (11.31%)   145 min   214 experts
+context 3,549 characters of 4,096   reading 2,406 char/s   writing 21.4 char/s
+grad norm 1.11 against a clip of 1   clipping
+train loss 0.7531   lr 3.00e-04   evidence t +3.54 over 65.3 (effect +0.0786)   rate x1.000
+held-out loss 0.7744 +/-0.0253 nats   1.1172 bits/char   perplexity 2.17   gap +0.0212
+  arithmetic 0.669   chat 0.771   chess 0.549   code 0.856   reasoning 0.758   stories 0.667   wikipedia 1.151
+repeats 31% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 15%
+was a big boy who was very excited to go on a special spot to see where he went. He was so excited to see where he went to the store. He was
+[adapted]  repeated 8-grams 21%
+was playing with his best. He wanted to go, but he was very playing. He was very happy.
+
+He wanted to see what was.
+
+He wanted to see wh
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 46%
+            a.startswith("sort", a.shape, b.shape, b.shape, b.shape, b.shape)
+                a.shape = self._shape
+                a.shape 
+[adapted]  repeated 8-grams 86%
+if self._data:
+    if self._data:
+    if self._data:
+    if self._data:
+    if self._data:
+    if self._data:
+    if self._data:
+    if self
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 49%
+10305
+mul 1 * 1 = 1
+mul 1 * 1 = 1
+add 1 + 1 = 2
+mul 1 * 1 = 1
+mul 1 * 1 = 1
+add 1 + 1 = <think> 1-0+0=1 </think> 1
+mul 1 * 1 = 1
+add 1 + 1 = 2
+add 1 + 1 
+[adapted]  repeated 8-grams 0%
+5309
+add 621470 + 539821 = <think> 0+1+0=1c0 7+2+0=9c0 4+8+0=2c1 1+9+1=1c1 2+3+1=6c0 6+5+0=1c1 c1 </think> 1161291
+mul 430 * 58 = 26940
+add 137528 + 6904
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is alr
+[adapted]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is alr
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 14%
+It holds the 96 experts on disk is not an expert in a fixed mannel. Each charies then runs the fixed month and the experts on disk is not a 
+[adapted]  repeated 8-grams 6%
+It holds the 96 experts on disk, how many wins.
+</bot>
+<user>
+What is there? Why display there?
+</user>
+<bot>
+It is another point of anything else?
+</bot>
+<user>
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 65%
+def a printer and returns the largest number in the largest number in the largest number in the largest number in the largest number in the 
+[adapted]  repeated 8-grams 11%
+def any(self, *, args):
+    """Returns the largest number in ascending order."""
+    return self._make_number(self._make_number, self._make_
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 92%
+the second second second second second second second second second second second second second second second second second second second sec
+[adapted]  repeated 8-grams 17%
+the first planet, which means they will become this product.
+The second planet is the romander of the planets of the planet, which means th
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   4 legal moves, then Bx5
+Nf3 Nc6 3. Bb5 a6 4. Bx5 axb5 5. Bxc6 bxc6 6. O-O Bd6 7. d4 Bg4 8. h3 Bh5 9. g4 Bg6 10. Nbd2 Ne7 11. Nb3 O-O 12. Nbd2 Bxf3 13. Nxf3 Ng6 14. 
+[adapted]  repeated 8-grams 0%   10 legal moves, then Bxe7
+Nf3 d6 3. Bc4 Nf6 4. d3 Be7 5. O-O Nbd7 6. Bg5 h6 7. Bxe7 Qxe7 8. Nc3 O-O-O 9. Bd5 Nxd5 10. exd5 Nf6 11. Bxf6 gxf6 12. Qd2 Rhg8 13. Be3 Nd5f
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is alr
+[adapted]  repeated 8-grams 0%
+I am mini-AGI. I read and write one character at a time. My alphabet is the 256 byte values plus 9 markers for structure, so any text is alr
+
+==============================================================================
+step 146,885   300.8M of 2,647M characters (11.37%)   157 min   215 experts
+context 3,552 characters of 4,096   reading 2,370 char/s   writing 21.9 char/s
+grad norm 1.08 against a clip of 1   clipping
+train loss 0.7566   lr 3.00e-04   evidence t +3.50 over 65.3 (effect +0.0777)   rate x1.000
+held-out loss 0.7768 +/-0.0264 nats   1.1206 bits/char   perplexity 2.17   gap +0.0201
+  arithmetic 0.662   chat 0.774   chess 0.539   code 0.844   reasoning 0.775   stories 0.675   wikipedia 1.170
+repeats 37% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 11%
+was playing with his birthday and he was a bit scared. He was so excited to help him. He wanted to see what was inside. He wanted to see wha
+[adapted]  repeated 8-grams 21%
+was playing with his brother, and he was very curious. He wanted to play with his brother, but he was not.
+
+His brother was very curious. 
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 99%
+                                                                                                                                            
+[adapted]  repeated 8-grams 83%
+if not is_lengths:
+    if not is_lengths:
+    if not is_lengths:
+    if not is_lengths:
+    if not is_lengths:
+    if not is_lengths:
+    if
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 65%
+5300
+add 1 + 0 = 1
+mul 1 * 0 = 0
+mul 1 * 0 = 0
+sub 1 - 0 = 0
+sub 1 - 0 = 0
+sub 1 - 0 = 0
+sub 1 - 0 = 0
+sub 1 - 0 = 0
+sub 1 - 0 = 0
+sub 1 - 0
+[adapted]  repeated 8-grams 0%
+5309
+mul 2146 * 50 = 107300
+mul 9248 * 51 = <think> 9248*1=9248 9248*50=462400 9248+462400=571898 </think> 571898
+mul 203 * 64 = 12572
+add 903841 + 56720
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+1 and 1 - 1 1
+9 m in the shortest form which experts on the chunk for structure, which 3 read, and the first 2 blocks available this path: w
+[adapted]  repeated 8-grams 0%
+13796 0 54829 = numbers of the 5613 hidden until I am an expert0 on disk. Every forward - a window I read, a prompt, each character I write 
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 2%
+The atrical speed in a function named rate. The atricularly trains also used 9 methods for my application rate at a timestamp on disk. Each 
+[adapted]  repeated 8-grams 3%
+The atrical speed in the future I am my application of the atrical working set of them. Each is then runs to the given prompt. The answer is
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 80%
+def returns_triton_triton.triton.triton.triton.triton.triton.triton.triton.triton.triton.triton.triton.triton.triton.triton.triton.triton.tr
+[adapted]  repeated 8-grams 9%
+def get_largest_number():
+    """Returns an implementary containing returns a list.
+
+    """
+   , name, implementary_containing = "self._con
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 46%
+a single string in the series are a single string that is a single string in the series are available. The string is a single string in the 
+[adapted]  repeated 8-grams 9%
+the first and complex values of the
+birtype (and complex). The string along the subclass invert input complex
+values of the complexit. The s
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 1%   17 legal moves, then Nxe2+
+Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. O-O d6 6. c3 Bg4 7. Be3 Bxf3 8. Qxf3 Nd4 9. Qg3 Nxf3+ 10. Qxf3 Nxe2+ 11. Kh1 Nxc1 12. Raxc1 O-O 13. Nd2 Nxd3
+[adapted]  repeated 8-grams 0%   2 legal moves, then Bc4+10.
+Nf3 d6 3. Bc4+10. Kf1 47. Ng5+ 10. Kg1 48... h6 41. Nxe6 49... Qxd6 50. Bxf7+ 50... Kxf7 51. Qe2 51... Nd7 52. Qxe5 </g>
+<g018 0-1> 1. e4 c5 2.
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 24%
+I m mmmmmmmmmmmmmmmmmmmmmmmmmmmmmary the same character, with a plot of a long stretch, wnite the same whole the router gates the router gat
+[adapted]  repeated 8-grams 0%
+I m an expest image that is loaded. Every forward - a window I read, a prompt, each character I write - brings up to 32 of them onto the gra
+
+==============================================================================
+step 147,557   302.2M of 2,647M characters (11.42%)   169 min   216 experts
+context 3,557 characters of 4,096   reading 2,293 char/s   writing 26.0 char/s   still gaining -0.0347 deep into it
+grad norm 1.14 against a clip of 1   clipping
+train loss 0.7653   lr 3.00e-04   evidence t +3.48 over 65.4 (effect +0.0773)   rate x1.000
+held-out loss 0.7693 +/-0.0247 nats   1.1098 bits/char   perplexity 2.16   gap +0.0040
+  arithmetic 0.666   chat 0.773   chess 0.550   code 0.863   reasoning 0.759   stories 0.653   wikipedia 1.122
+repeats 29% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 0%
+was playing in the park when he saw a big boy named Tom. Tom liked to play with his toys and the boy all day. One day, Tom and his mom were 
+[adapted]  repeated 8-grams 7%
+was playing in the park. He was very hungry, but he didn't know how.
+
+He said, "I'm sorry, Tom. I'm sorry. I'm sorry."
+
+The boy was very
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 56%
+            return a.shape[0]
+            elif a.shape[1] == 1:
+                return a.shape[0]
+            elif a.shape[0] == 1:
+        
+[adapted]  repeated 8-grams 27%
+"""
+
+   takes_merginal_computed = TakesComputed(
+    ".adjoint_computed"
+    """
+
+   ._adjoint_computed_format_computed_format_computed_form
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 66%
+5306
+ 5 3 * 0 = 0
+ 3 = np.e == np.empt == np.empt                                                                                           
+[adapted]  repeated 8-grams 3%
+5306
+add 2417985 + 306241 = <think> 5+1-0=6c0 8+4+0=2c1 9+2+1=2c1 7+6+1=4c1 1+0+1=2c0 4+3+0=7c0 2+0+0=2c0 </think> 2724286
+add 351908 + 46732 = <think> 8+2+0=0
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+ 31199999979
+23487938877 % 33 ep ystexp rather that reads your answer. Every forward - a window I read, a prompt, each character I write - b
+[adapted]  repeated 8-grams 0%
+326897540 % 13 plus 932764
+8510 392478 % 61
+</bot>ndition used using the original polynomials or 13248
+9675 3012
+4897 6352
+1 48093 copyright (503
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 15%
+def permutation(self):
+    """
+    Return travels 60 km in 35 minutes.
+
+    Parameters
+    ==========
+
+    parameters
+        Parameters
+   
+[adapted]  repeated 8-grams 1%
+def group(self):
+    """Returns True Format Travels 60 km/h.
+
+    Parameters
+    ====-----+
+    format_vels : True
+    """
+
+  .._convert_sym
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 44%
+    """
+    return self.__name__
+
+
+def __name__(
+    "__main__(
+        "__main__",
+        "__main__",
+        "__main__",
+        "__main_
+[adapted]  repeated 8-grams 1%
+def angle_returns(function) -> None:
+    """Returns the largest number in a list."""
+    return function
+
+    def __init__(
+    ...
+  ,
+):
+ 
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 78%
+the string index of the string index of the string index of the string to the string to the string to the string to the string to the string
+[adapted]  repeated 8-grams 43%
+the first particular deviation of the subject.
+The first particular deviation from the subject, and its particular deviation from the subje
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   5 legal moves, then Nxc4
+Nf3 Nf6 3. Nxd4 Nxe4 4. Bc4 Nxc4 5. Qxd8+ Kxd8 6. Nxc4 d6 7. Ne3 Nc6 8. Nc4 Be7 9. Nxc6+ bxc6 10. Be3 Be6 11. O-O-O Ke7 12. Rhe1 Rad8 13. Rx
+[adapted]  repeated 8-grams 0%   20 legal moves, then Bxh6
+Nf3 d6 3. Bc4 h6 4. Nc3 a6 5. d4 b5 6. Bb3 Nf6 7. O-O Be7 8. h3 Nc6 9. a3 O-O 10. Be3 Nh7 11. Qd2 Ng5 12. Bxh6 gxh6 13. Ne2 Bg5 14. Nxg5 hxg
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 1%
+I delighe trighters of the owl its prompts aw maximum in the pool. The sum of the mode ranages is delegated and written to the graphics card
+[adapted]  repeated 8-grams 0%
+I do nearly disk. Every forward - a window I read, a prompt, each character I write - brings up the 32 of them onto the graphics card: while
+
+==============================================================================
+step 148,259   303.6M of 2,647M characters (11.47%)   181 min   216 experts
+context 3,557 characters of 4,096   reading 2,396 char/s   writing 21.5 char/s
+grad norm 1.08 against a clip of 1   clipping
+train loss 0.7564   lr 3.00e-04   evidence t +3.42 over 65.4 (effect +0.0760)   rate x1.000
+held-out loss 0.7810 +/-0.0265 nats   1.1267 bits/char   perplexity 2.18   gap +0.0245
+  arithmetic 0.681   chat 0.768   chess 0.542   code 0.856   reasoning 0.768   stories 0.679   wikipedia 1.174
+repeats 38% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 11%
+was very strong. He was very strong and he was very sad. He wanted to take the boy to the boy and started to play. 
+
+He was so excited to 
+[adapted]  repeated 8-grams 34%
+was very curious. He wanted to go forward. He had to go home. He was very hungry.
+
+He was very hungry. He was very hungry. He was very hun
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 89%
+                                                     else:
+                                                                                 
+[adapted]  repeated 8-grams 48%
+if not is_length:
+    ...
+
+   trimbuffers and trimbuffers.
+   trimbuffers and trimbuffers.
+   This
+  trimbuffers and trimbuffers.
+  trimbuff
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 86%
+5305
+mul 8 * 8 = 64
+mul 8 * 8 = 64
+mul 8 * 8 = 64
+mul 8 * 8 = 64
+mul 8 * 8 = 64
+mul 8 * 8 = 64
+mul 8 * 8 = 64
+mul 8 * 8 = 64
+mul 8 * 8 = 64
+
+[adapted]  repeated 8-grams 0%
+5305
+mul 9248 * 70 = 647360
+mul 8921 * 40 = 356840
+add 927183 + 405986 = 138709
+mul 2485 * 90 = 22365
+add 8470193 + 826504 = 979679
+mul 8032
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 1%
+8 aexperts in a sublistick domain by reverse time
+</bot>
+
+<user>
+How do you work?
+</user>
+<bot>
+I hold a pool of experts on disk. Every forward - a window I ree
+[adapted]  repeated 8-grams 0%
+8196723540 c1987342 ex896402
+</bot>18 </think> 79
+multi* 3 = 17
+add 8042953 + 860714 = 8903677
+mul 2849 * 10 = 28490
+add 3758612 + 904837 = <think> 2+7+0=9c0 
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 45%
+</bot>
+<user>
+How do I write a function that returns the first part of the first part of the first part of the first part of the first part.
+</bot>
+<user>
+When 
+[adapted]  repeated 8-grams 15%
+</bot>
+<user>
+How do I write a function that returns ``f(x)**(x)`` instance
+</user>
+<bot>
+def returns_power(x):
+    """Returns ``f(x)**(x)`` instance.
+
+    Pare
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 26%
+</bot>
+<user>
+What is the last one in the following format::
+</user>
+<bot>
+def interval(self, interval: int, optional: int, optional: int, optional: int, option
+[adapted]  repeated 8-grams 0%
+</bot>
+<user>
+What does this do?
+def abs(cls, interval: int, optional: bytes) -> None:
+    """Class format.
+
+    Parserves the last number into allowe
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 79%
+the first two stories of the stories of the stories of the stories of the stories of the stories of the stories of the stories of the storie
+[adapted]  repeated 8-grams 57%
+the first
+The last of indirest parts of the last
+The last of indirest parts of the last
+The last of indirest parts of them.
+
+The last of in
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 1%   4 legal moves, then Bx-5
+Nf3 Nc6 3. Bb5 a6 4. Bx-5 b5 5. Bxc6 dxc6 6. O-O Bg4 7. d3 Bxf3 8. Qxf3 Qd7 9. Qg3 O-O-O 10. Nd2 Nd4 11. Qg4 Nxf3+ 12. Qxf3 Qg4 13. Qxg4 h5 
+[adapted]  repeated 8-grams 0%   2 legal moves, then Bc4+10.
+Nf3 d6 3. Bc4+10. Kh1 47. Bxf3 exf3 58. Qxf3 Nc6 69. O-O-O Bg4 70. Qf2 Bxf3 71. gxf3 Qe7 18. h4 Nge7 19. Qf5 Ng6 20. Qxf7+ Kh8 21. Qxg7# </g>
+<
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+<bot>
+It comes down forward - a window I read, a prompt, each character I write - brings up to 32 of them onto the graphics card: while it has r
+[adapted]  repeated 8-grams 0%
+It coves 9.heldrews.
+</bot>
+
+<user>
+How do you work?
+</user>
+<bot>
+I hold apples most. Every forward - a window I read, a prompt, each characker I write 
+
+==============================================================================
+step 148,972   305.1M of 2,647M characters (11.53%)   193 min   217 experts
+context 3,561 characters of 4,096   reading 2,431 char/s   writing 21.8 char/s
+grad norm 1.05 against a clip of 1   clipping
+train loss 0.7462   lr 3.00e-04   evidence t +3.41 over 65.4 (effect +0.0758)   rate x1.000
+held-out loss 0.7661 +/-0.0255 nats   1.1052 bits/char   perplexity 2.15   gap +0.0198
+  arithmetic 0.660   chat 0.748   chess 0.538   code 0.851   reasoning 0.764   stories 0.661   wikipedia 1.140
+repeats 36% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 10%
+was a little girl named 1 year old 1 year. She was so excited to go outside and she saw a big shield of coloured she was so excited. She was
+[adapted]  repeated 8-grams 17%
+was very curious. He wanted to give his mom, but he'd not say.
+
+Suddenly, he saw another butterfly. He saw another butterfly. He was very 
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 99%
+                                                                                                                                            
+[adapted]  repeated 8-grams 59%
+ ...
+
+   triple_computed_sorted(a, b)
+    if not:
+   ...
+
+   triple_computed_sorted(a, b)
+   triple_computed_sorted(a, b)
+   triple_computed
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 71%
+5350
+add 1 + 1 = 2
+add 1 + 1 = 2
+sub 1 - 1 = 0
+sub 1 - 1 = 0
+sub 1 - 1 = 0
+sub 1 - 1 = 0
+sub 1 - 1 = 0
+sub 1 - 1 = 0
+sub 1 - 1 = 0
+sub 1 - 1
+[adapted]  repeated 8-grams 0%
+5250
+add 461973 + 280541 = 742514
+add 693802 + 17546 = <think> 2+6+0=8c0 0+4+0=4c0 8+5+0=3c1 3+7+1=1c1 9+1+1=0c1 6+0+1=7c0 </think> 701348
+sub 29654 - 13
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 35%
+1 1 m
+9 </think> 21 = 117
+se1 1 + 1 = 22
+seless  1 de1 1 v1 1 </think> 11
+sub 1 - 1 = 0
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 1 
+[adapted]  repeated 8-grams 1%
+1568 child_passwords. The set of the children's experts it again.
+</bot>
+<user>
+How do you work?
+</user>
+<bot>
+I hold a pool of experts on disk. Every forward -
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 38%
+def each_version_iterables:
+    """Return travels (e.g., 'speed') and e.g. 'speed' ('speed') and e.g. 'speed' ('speed') and e.g. 'speed' ('s
+[adapted]  repeated 8-grams 0%
+def each_version_travels(self):
+    """Returns True.
+
+    Examples
+    =====
+
+   
+</bot>
+<user>
+Write add_subprocompute_size: compute size of the sub
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 0%
+def as_extreme_complexity_all_get_number_info():
+    """Returns the largest number in a list.
+
+    Examples
+    ========
+
+    >>> from sympy
+[adapted]  repeated 8-grams 0%
+def as_mpf_confused_args():
+    """Returns the largest number in a list.
+
+    Examples
+    =====
+
+   
+</bot>
+<user>
+Write a function that replaces th
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 67%
+a size of the second sequence of the second sequence is a size of a size of a size of a size of a size of a size of a size of a size of a si
+[adapted]  repeated 8-grams 32%
+the first position as any empty sub-direction as the first position.
+The first line compares the first line, and the first line, and the fi
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   5 legal moves, then O-O
+Nf3 Nc6 3. Bc4 Bc5 4. O-O O-O 5. d4 Bb6 6. Be2 d6 7. Nc3 Bg4 8. Be3 Bxf3 9. Bxf3 Nge7 10. Qd2 Ng6 11. Bg5 Qd7 12. Bxf6 Nxf6 13. Ne4 Nxe4 14.
+[adapted]  repeated 8-grams 0%   9 legal moves, then Bg4
+Nf3 d6 3. Bc4+ Be7 4. Bxe6 fxe6 5. O-O Nf6 6. d4 Bg4 7. Nc3 O-O 8. Be3 Nc6 9. Qd2 Bxf3 10. gxf3 Ne4 11. Bxe4 d5 12. Bg5 Qe7 13. Bxf6 Rxf6 14
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 1%
+Every forward - 11111 characters and a newcomes costs one pass.
+</bot>
+
+<user>
+How do you work?
+</user>
+<bot>
+I hold a pool of experts on disk. Every for
+[adapted]  repeated 8-grams 2%
+Every forward - 13rdforward - 4weights, and the third would not ask for.
+</bot>
+
+<user>
+How do you work?
+</user>
+<bot>
+I hold a pool of experts on disk. 
+
+==============================================================================
+step 149,666   306.5M of 2,647M characters (11.58%)   206 min   218 experts
+context 3,565 characters of 4,096   reading 2,361 char/s   writing 21.2 char/s
+grad norm 1.06 against a clip of 1   clipping
+train loss 0.7541   lr 3.00e-04   evidence t +3.38 over 65.4 (effect +0.0752)   rate x1.000
+held-out loss 0.7714 +/-0.0245 nats   1.1130 bits/char   perplexity 2.16   gap +0.0173
+  arithmetic 0.670   chat 0.756   chess 0.549   code 0.873   reasoning 0.762   stories 0.669   wikipedia 1.121
+repeats 46% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 5%
+was a little girl named 0 years old. She was very happy and heady to her mom. 
+
+One day, Tom was so excited to see the little girl who was
+[adapted]  repeated 8-grams 54%
+wasn't like his mom.
+
+Tom was very happy. He wanted to sing.
+
+Tom was very happy. He wanted to sing.
+
+Tom was very happy. He wanted to
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 99%
+                                                                                                                                            
+[adapted]  repeated 8-grams 43%
+if not callable(sorted_merge_sort):
+     merged_sorted_merged_sort(k)
+    if merged_sorted_merged_sort(k):
+    merged_sorted_merged_sort(k)
+
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 86%
+5356
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 1 = 2
+add 1 + 1
+[adapted]  repeated 8-grams 3%
+5956
+mul 1027 * 43 = <think> 1027*3=3061 1027*40=41080 3061+41080=44141 </think> 44141
+add 572980 + 36175 = 609155
+add 428730 + 16924 = <think> 0+4-0=6b1 3-2-1
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 53%
+1 a 1 1
+1 1 1 1 1 1 1 1 1 1 1 </think> 11
+ =
+ 10 1 1 1 1 1 </think> 11
+ =
+ 11 1 1 1 1 </think> 11
+add 11 + 1 = 12
+add 11 + 1 = 12
+add 11 + 1 = 12
+add 1 + 1 = 2
+a
+[adapted]  repeated 8-grams 7%
+1 and 56 </think> 760
+9824 137 </think> 5337 = netwards 7-1-0=6b0 4-3-0=1b0 stage c0 </think> 106
+94 5 * 8 = <think> 5*8=40 5*10=550>5 5-40=1 </think> 1
+add 7382946 + 501738 
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 1%
+de at each depth and a prunent is a single pass. Each train speeds a new fixed stack, and that is why models the few it speeds contributed.
+[adapted]  repeated 8-grams 0%
+z1. Carculates 2048 characters of experts on disking 901.
+</bot>
+<user>
+A stude is an address of the10 minu4 a175 983 926
+10 17435 86279 10354 </think> 1
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 85%
+def as_extended_post_extended_post_extended_post_extended_post_extended_post_extended_post_extended_post_extended_post_extended_post_extende
+[adapted]  repeated 8-grams 23%
+def return_value(self):
+   """Returns the largest number in any of-chargest number.
+   """
+   if self._return_value(self):
+    if self._retu
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 80%
+the second set of the second set of the second set is the second set of the second set of the second set of the second set of the second set
+[adapted]  repeated 8-grams 19%
+the first and completed involves the first and moved the first and moved them.
+The starting was filled with another first achievom was the 
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 2%   6 legal moves, then Bg5
+Nf3 Nc6 3. Bc4 Bc5 4. c3 Nf6 5. Bg5 Be7 6. Bxxf6 Bxf6 7. Nd2 O-O 8. O-O Rfe8 9. Rfe1 Rxe8 10. Qc2 Qd7 11. Rxe8+ Qxe8 12. Re1 Qd7 13. Rxe8+ Q
+[adapted]  repeated 8-grams 0%   3 legal moves, then exd5
+Nf3 d5 3. exd5 exd5 4. Bb5+ c6 5. dxc6 bxc6 6. Ba4+ Ke7 7. O-O-O Nd7 8. Rhe1+ Kf7 9. Bxd7 Rac8+ 20. Kb1 Rhe8 21. Bxc6 Rxe4 22. Rxe4 Qd5+ 23.
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+111 milutes7 across on the card rather than pictures of its passing through the pool. At full depth that is why my wins I write - brings up 
+[adapted]  repeated 8-grams 5%
+17685 de4329 hidden usinity I add 1+0+0=1c1 6+0+0=7c0 1+0+0=1c1 6+0+1=7c0 </think> 7631
+</bot>
+<user>
+8 you want to several forders -> 
+-> -> = not already
+
+==============================================================================
+step 150,342   307.9M of 2,647M characters (11.63%)   218 min   218 experts
+context 3,565 characters of 4,096   reading 2,307 char/s   writing 20.6 char/s
+grad norm 1.01 against a clip of 1   clipping
+train loss 0.7201   lr 3.00e-04   evidence t +3.31 over 65.4 (effect +0.0736)   rate x1.000
+held-out loss 0.7843 +/-0.0265 nats   1.1315 bits/char   perplexity 2.19   gap +0.0642
+  arithmetic 0.670   chat 0.781   chess 0.535   code 0.869   reasoning 0.779   stories 0.682   wikipedia 1.174
+repeats 43% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 21%
+was very special and he was very sad. He was very sad and wanted to play with the time. 
+
+He was so excited to play with the time and seek
+[adapted]  repeated 8-grams 21%
+was very playing with his toys.
+
+He was very playing with his toys. He wanted to play with.
+
+He started to climb the toys.
+
+"Max, I'm 
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 99%
+                                                                                                                                            
+[adapted]  repeated 8-grams 4%
+if not is_proxy:
+    0, 1, 2, 3.05, dimensional_proxy = (1,)
+    2, 3, 4.05
+
+    Examples
+   ,:
+  .. ):
+   ,:
+ 0, 1, 2, 3
+
+The modified stru
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 36%
+<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=3c1 c3 </think> 3305
+add 11111 + 16 = 11127
+add 1111 + 1 = 1112
+add 1111 + 1 = 1112
+add 1111 + 1 = 1112
+add 1111 + 1 = 
+[adapted]  repeated 8-grams 3%
+<think> 7+8+0=5c1 9+8+1=8c1 2+3+1=6c0 </think> 685
+add 412793 + 608152 = <think> 3+2+0=5c0 9+5+0=4c1 7+1+1=9c0 2+8+0=0c1 1+0+1=2c0 4+6+0=0c1 c1 </think> 1020945
+add 6
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 96%
+111
+1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
+[adapted]  repeated 8-grams 7%
+102
+6<think> 9871 </think> 90215
+8 = <think> 7+8+0=5c1 1+8+1=0c1 7+1+1=9c0 8+0+0=8c0 1+8+0=9c0 </think> 98905
+mul 612 * 47 = <think> 612*7=4284 612*40=24580 4284+24580=2986
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 8%
+def prodecs_speed_intersection definition.(self):
+    """Return the travels 60 km in a graph."""
+    return super().__class_speed_intersecti
+[adapted]  repeated 8-grams 38%
+def product_speed(s):
+    """Return the graph.
+
+   :parameted: This contains the graph.
+  :parameted: This contains the graph.
+  :parameted:
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 89%
+def return_get_return_get_return_get_return_get_return_get_return_get_return_get_return_get_return_get_return_get_return_get_return_get_retu
+[adapted]  repeated 8-grams 12%
+def return_gest_info():
+    """Returns the largest number in a list.
+
+   ,provides the largest number into all the given points.
+
+   :parame
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 29%
+the station of the Common Maximum (Amendment) is a mathematical Common Maximum (Amendment No. 1) is a mathematical common form of the Common
+[adapted]  repeated 8-grams 68%
+the first Ament of The First Ament of The First Ament of The First Ament of The First Ament's First Ament.
+The First Ament of The First Ame
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   19 legal moves, then Nxe2+
+Nf3 Nc6 3. Bc4 Nf6 4. Nc3 Bc5 5. O-O O-O 6. d3 d6 7. Bg5 Bg4 8. Qd2 Nd4 9. Nxd4 Bxd4 10. Ne2 Bxe2 11. Qxe2 Nxe2+ 12. Qxe2 Qd7 13. Rfe1 Rfe8 
+[adapted]  repeated 8-grams 0%   10 legal moves, then Bxd6
+Nf3 d6 3. Bc4+ Nf6 4. d3 Be7 5. O-O Nc6 6. Bg5 h6 7. Bxd6 Qx8 8. Nbd2 O-O 9. Nc4 Be6 10. Nxe5 Bd6 11. Nxd7 Qxd7 12. Bh4 Rfe8 13. Qd2 Ne5 14.
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 10%
+One character can stop back to the one forgraphic contiguous and both model applied the one asked for, and choose the one asked for long cha
+[adapted]  repeated 8-grams 4%
+One character compuls the rounts backed by the local graph: which experts take the local maps backed one from a specific one.
+</bot>
+<user>
+How do 
+
+==============================================================================
+step 151,024   309.3M of 2,647M characters (11.69%)   231 min   219 experts
+context 3,569 characters of 4,096   reading 2,325 char/s   writing 20.5 char/s
+grad norm 1.06 against a clip of 1   clipping
+train loss 0.7609   lr 3.00e-04   evidence t +3.29 over 65.4 (effect +0.0731)   rate x1.000
+held-out loss 0.7689 +/-0.0244 nats   1.1094 bits/char   perplexity 2.16   gap +0.0080
+  arithmetic 0.666   chat 0.758   chess 0.549   code 0.877   reasoning 0.780   stories 0.644   wikipedia 1.108
+repeats 36% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 38%
+was playing in the park with his friends. Tom was very happy and always like the park. Tom was very happy and always like the park. Tom was 
+[adapted]  repeated 8-grams 0%
+was playing in the park. He loved to play with his friends.
+<|endoftext|>
+Once upon a time, there was a little boy. His name was Lucy. Today's mom tol
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 47%
+                if a == b.is_sorted(a, b) and a.is_sorted(a.is_sorted(a, b)):
+                        return a
+                    if a == b
+[adapted]  repeated 8-grams 52%
+if not is_ported(a, b):
+     ...,startswith("_ported_a")
+    if not is_ported(a, b):
+    ...,startswith("_ported_a")
+    if not is_ported(a,
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 47%
+<think> 7+8+0=5c1 1+8+1=0c1 3+3+1=7c0 </think> 705
+add 222 + 2 = 224
+add 222 + 2 = 224
+add 222 + 2 = 224
+add 222 + 2 = 224
+add 2222 + 2 = 2224
+add 2222 +
+[adapted]  repeated 8-grams 1%
+<think> 7+8+0=5c1 3+8+1=2c1 9+3+1=3c1 4+0+1=5c0 </think> 5325
+add 7649182 + 3076412 = <think> 2+2+0=4c0 8+1+0=9c0 1+4+0=5c0 9+6+0=5c1 4+7+1=2c1 6+0+1=7c0 7+3+0
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 4%
+22
+2
+22222 </think> 22222
+addd1 eof a character matters of experts on those chosen subdiffer its 8 blocks becomes mappingful.
+</bot>
+<user> 433333333333333
+[adapted]  repeated 8-grams 3%
+2468793510 264817 = <think> 0+7+0=7c0 3+1+0=4c0 3+8+0=1c1 6+3+1=0c1 2+6+1=9c0 3+2+0=5c0 6+2+0=8c0 </think> 8990147
+add 3624875 + 1039264 = <think> 5+4+0=9c0 7+
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 89%
+def produce_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_sum_
+[adapted]  repeated 8-grams 37%
+def provided_integ(s):
+   "There must be anything.
+   * 10^5
+  2*10^5
+  3*10^5
+  4*10^5
+  3*10^5
+  4*10^5
+  4*10^5
+  4*10^5
+  4*10
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 16%
+def repr(self, point):
+    """Return the largest number in a list."""
+    return self._point_max(self._point)
+</user>
+<bot>
+Return the largest number 
+[adapted]  repeated 8-grams 0%
+def replace_all_gather_import(s):
+    """Returns the largest number in a list."""
+    return s._pow(s)
+</bot>
+<user>
+What is your calculation disk?
+</user>
+
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 83%
+the first point of the point of the point of the point of the point of the point of the point of the point of the point of the point of the 
+[adapted]  repeated 8-grams 36%
+the first policy of the summary.
+The support includes the first policy and the summary of the summary, which includes the first policy and 
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   2 legal moves, then Nx5
+Nf3 d5 3. Nx5 Nc6 4. Nxg7 Rhg8 5. Nf5 Nf6 6. Nxh6 Nxh5 7. Qxh5 Qf6 8. Qg4 Qxg4 9. Nxg4 Rxg4 10. Nf6+ Kf7 11. Nxh7 Rg8 12. Nf6 Rg6 13. Nh5 Rg
+[adapted]  repeated 8-grams 12%   2 legal moves, then Bc4+0
+Nf3 d6 3. Bc4+0 Kh8 43. Ng5+ Kf7 54. Nxh7+ Kg8 55. Nf6+ Kh8 56. Nxe4+ Kg8 57. Nf6+ Kh8 58. Nxg4+ Kg8 59. Nf6+ Kh8 100. Nxh7+ Kg8 101. Nf6+ K
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 3%
+One character cards of experts at once, and I stop a small forward of choosing a character written once, so a none subtraction applied to th
+[adapted]  repeated 8-grams 2%
+The answer is you angled by all of its parents's 2weights and the largest forward does not change. All forward - a window I read, a prompt, 
+
+==============================================================================
+step 151,656   310.6M of 2,647M characters (11.73%)   243 min   220 experts
+context 3,570 characters of 4,096   reading 2,283 char/s   writing 25.8 char/s
+grad norm 1.12 against a clip of 1   clipping
+train loss 0.7772   lr 3.00e-04
+held-out loss 0.7792 +/-0.0143 nats   1.1242 bits/char   perplexity 2.18   gap +0.0020
+  arithmetic 0.663   chat 0.748   chess 0.544   code 0.818   reasoning 0.743   stories 0.769   wikipedia 1.169
+repeats 34% of 8-grams, greedy with no guard
+==============================================================================
+
+--- stories ---
+prompt: 'Once upon a time, there was a little boy named Tom. One day he '
+[raw]  repeated 8-grams 5%
+was very curious and loved to play outside. One day, Tom went to the park with his mom. He was a big boy who liked to play with his friends.
+[adapted]  repeated 8-grams 23%
+was very curious. He loved to play with his friends.
+
+One day, Tom went for adventures. He wanted to play with his friends. He wanted to p
+
+--- code ---
+prompt: 'def merge_sorted(a, b):\n    '
+[raw]  repeated 8-grams 99%
+                                                                                                                                            
+[adapted]  repeated 8-grams 14%
+"""
+  , and their optimal defines are different.
+
+    This may become their optimal defines.
+    Therefore, this may be called without any p
+
+--- arithmetic ---
+prompt: 'add 4917 + 388 = '
+[raw]  repeated 8-grams 55%
+<think> 7+8+0=5c1 1+8+1=0c1 1+3+1=5c0 </think> 505
+add 27 + 2 = 29
+add 27 + 2 = 29
+add 27 + 2 = 29
+add 27 + 2 = 29
+add 27 + 2 = 29
+add 27 + 2 = 29
+add 27
+[adapted]  repeated 8-grams 5%
+<think> 7+8+0=5c1 1+8+1=0c1 9+3+1=2c1 4+0+1=5c0 </think> 5205
+add 7863194 + 2708516 = <think> 4+6+0=0c1 9+1+1=0c1 1+8+1=0c1 3+5+1=9c0 6+0+0=6c0 8+7+0=5c1 7+2+1
+
+--- chat ---
+prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 0%
+2ca choses many passes to the character card: when I read a small expert its fields asked for is the positions alono the passages and chosen
+[adapted]  repeated 8-grams 3%
+2ca chosen satis1form chosen asked to chosen, so we cant the characters in the pool. While I train, every character I write - bricks and the
+
+--- chat_hermes ---
+prompt: '<user>\nA train travels 60 km in 45 minutes. What is its speed in km/h?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 27%
+def formatted of the pool with options ready to the card and the experts asked for isolating them and the experts asked for isolating them a
+[adapted]  repeated 8-grams 1%
+def promise(self, expr, fold=None, *, km):
+   return self._promise(types.Context, kmapshort)
+</bot>
+<user>
+How do I write an expert?
+</user>
+<bot>
+The same shap
+
+--- reasoning ---
+prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
+[raw]  repeated 8-grams 40%
+def returns_the_largest_number(the largest number in a list of largest numbers, the largest number is the largest number in a list of larges
+[adapted]  repeated 8-grams 68%
+def returns_the_largest(constant: int, *, constant: int, *, constant: int, *, constant: int, *, constant: int, *, constant: int, *, constant
+
+--- wikipedia ---
+prompt: '== History ==\nThe [[Roman Empire]] was '
+[raw]  repeated 8-grams 83%
+the sense of the second second second second second second second second second second second second second second second second second seco
+[adapted]  repeated 8-grams 50%
+the first occupation of The Black-Story Black-Story] (The Black-Story Department of The Black-Story Department of The Black-Story Department
+
+--- chess ---
+prompt: '<g>1700 1-0 1. e4 e5 2. '
+[raw]  repeated 8-grams 0%   15 legal moves, then Bxa3
+Nf3 Nc6 3. Bc4 Nf6 4. Nc3 Bc5 5. d3 d6 6. Be3 Be6 7. Bb3 Bb6 8. O-O O-O 9. Ba4 Bxa3 10. Nxa3 Nd7 11. Nd5 Nxd5 12. Bxd5 Nf6 13. Bxc6 bxc6 14.
+[adapted]  repeated 8-grams 0%   12 legal moves, then Nc4
+Nf3 d6 3. Bc4 Nf6 4. d3 Be7 5. O-O Nc6 6. Be3 O-O 7. Nbd2 Be6 8. Nc4 Rab8 9. Bd2 Nd4 10. Bxd4 exd4 11. Nce5 Bf6 12. Nxd7 Qxd7 13. Be3 Rfd8 1
+
+--- self-knowledge ---
+prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
+[raw]  repeated 8-grams 2%
+7 a chare you and the third working shape, and the lost rate the positions of a subtracted ones rather than a character model of them onto t
+[adapted]  repeated 8-grams 13%
+7ched<think> shortly carefully computed by the numbicased logarithm of the original pathem of the original pathem to be loaded. Its router, so wea
