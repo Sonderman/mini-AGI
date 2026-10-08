@@ -379,7 +379,7 @@ def api_chat():
     model = STATE["model"]
     msgs = body.get("messages", [])
     prompt = build_prompt(msgs, int(model.cfg.block * 0.9), PRIME)
-    max_new = int(body.get("max_new", 400))
+    max_new = int(body.get("max_new", 2048))
     # the half of the exchange the model did not predict, which is where the
     # signal in a conversation is
     last_user = next((m.get("content") for m in reversed(msgs)
@@ -731,7 +731,7 @@ document.getElementById('f').onsubmit = async (e) => {
   try {
     const r = await fetch('/api/chat', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({messages, max_new: 400})
+      body: JSON.stringify({messages, max_new: 2048})
     });
     const reader = r.body.getReader();
     const dec = new TextDecoder();
@@ -841,7 +841,7 @@ def main():
                          "the plasticity controller scales as it does in "
                          "training. Defaults to the base the training run "
                          "used, then training.lr in config.yaml")
-    ap.add_argument("--prime-chars", type=int, default=1024,
+    ap.add_argument("--prime-chars", type=int, default=0,
                     help="characters of corpus to open the conversation "
                          "with, so the router has something to choose "
                          "experts from and the learning stream starts part "
