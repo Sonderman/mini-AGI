@@ -156,8 +156,8 @@ growth:
   keep_ratio_min: 0.35
   recent_mult: 4.0        # "still young" is age < this x the trial
 
-  # ROOM. An expert is 25.2 MB, so 10 GB is about 397 of them.
-  max_disk_gb: 10.0       # ceiling on the pool on disk. 0 for no limit
+  # ROOM. An expert is 25.2 MB, so 16 GB is about 635 of them.
+  max_disk_gb: 16.0       # ceiling on the pool on disk. 0 for no limit
   mem_frac: 0.95          # refuse to grow past this share of the card
 
   birth_gate: 0.001       # gate a new expert starts at - a scale, not a
