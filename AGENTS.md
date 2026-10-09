@@ -4,7 +4,7 @@ Scope: local checkout of **volotat/mini-AGI**, kept rebased onto upstream — up
 this copy was being set up, and the local branch was **rebased onto `5c57a38` on 2026-10-08** (faster expert
 loading in `minagi/paged.py`; README/assets). The 2026-10-07 rebase onto `e6cfda8` had brought reading-speed
 work, AMD support + a robust LR controller, the `PYTORCH_ALLOC_CONF` rename fix and `pool.balance` retuned
-3.5e-4 -> 2.5e-4; `runs/samples.txt` is kept as ours - upstream appends their own history. The local
+3.5e-4 -> 2.5e-4; `runs/samples.txt` is untracked + ignored since 2026-10-09 (Ali's call; ignore rule `samples.txt`); upstream rebases surface a modify/delete on it - keep the deletion. The local
 commits ride on top: `serve` guard + UI defaults, this file, `start.bat`, the self-knowledge passage, the
 samples history. The model is a
 continually-learning byte-level LM that assembles its own architecture, trains on a single ≥8 GB GPU,
@@ -80,7 +80,10 @@ against ~2,600 before it - external load suspected, not the model. A `--minutes 
   12-15 legal moves now. The first run on the wired corpus (`--minutes 60`: 151,656 -> 155,130; 7.11M characters)
   dropped the new-val held-out 1.1429 -> 0.9254 in one hour - a first-contact burst (new material
   incl. Turkish, never seen before), not a comparable rate; the self-description samples came back
-  clean and count-free. Without `--save` it is a dry read and `weights/` is untouched.
+  clean and count-free. A `--minutes 898` overnight session (155,130 -> 211,535; 115.52M characters;
+  held-out 0.9254 -> 0.8594; pool 223 -> 281) held ~2.4k char/s all night; turkce fell 1.589 ->
+  1.198, an addition landed one off (4917+388 -> '5306'), the chat samples turned coherent, and
+  the pool reached 7.5 GB of the 10 GB disk ceiling (Warts #5). Without `--save` it is a dry read and `weights/` is untouched.
 - Serve the web UI:
   ```
   .venv/Scripts/python.exe serve.py --port 8080        # → http://127.0.0.1:8080   (HTTP 200 verified)
@@ -90,7 +93,7 @@ against ~2,600 before it - external load suspected, not the model. A `--minutes 
   Or double-click **`start.bat`** — checks the venv, refuses to start a second instance, opens the
   browser when the model is ready; extra arguments are forwarded (`start.bat --no-learn`).
 - Inspect the model (verified): `.venv/Scripts/python.exe -m minagi.store weights`
-  → e.g. `step 155,130`, 223 experts, 227 files, 6081.8 MB (199 carrying + 24 gated; 709.9M params).
+  → e.g. `step 211,535`, 281 experts, 285 files, 7541.8 MB (255 carrying + 26 gated; 892.4M params).
   `train.py read --help` lists every knob.
 
 ## File map
@@ -101,7 +104,7 @@ against ~2,600 before it - external load suspected, not the model. A `--minutes 
 | `.venv/` | this machine's Python + packages (torch 2.9.1+cu128) | rebuild with uv (recipe above) |
 | `start.bat` | local launcher for the web UI: venv check, duplicate-server guard, opens the browser when the model is ready; forwards extra args to serve.py | Ali/Hermes; keep in sync with serve.py flags |
 | `keepawake.py` | local: holds the system awake for N minutes during long runs (`python keepawake.py <minutes>`); display may sleep, lid-close sleep is not defeated | Ali/Hermes; run it from the repo root, never from scratch (scratch gets pruned) |
-| `weights/` | THE model — best state so far (step 155,130, 223 experts, ≈6.08 GB). Written atomically; grows/prunes experts itself | written by `read --save` and by `serve` in learning mode; never hand-edit |
+| `weights/` | THE model — best state so far (step 211,535, 281 experts, ≈7.54 GB). Written atomically; grows/prunes experts itself | written by `read --save` and by `serve` in learning mode; never hand-edit |
 | `data/train`, `data/val` | the corpus the reader opens; subjects = top-level dirs (arithmetic, chat, chess, code, pg19, reasoning, self-knowledge, stories, turkce, wikipedia); `chat/hermes` is the OpenHermes part of the chat lane | `corpora all` / `corpora expand` |
 | `data_*_char/` | intermediate uint16 `.bin` sources for `expand` (code, arithmetic, chat, chess; chess rebuilt 2026-10-05: 4M games → 1.95B tokens; expanded into `data/train/chess` 2026-10-08: 1,961.2M chars / 9,820 shards) | the generators; keep — `expand --only` rebuilds `data/` from them without re-downloading |
 | `runs/` | logs, sample history (`samples.txt` is the tracked one), dashboard/progress PNGs, `corpus_index.json` cache | training writes; nothing else there is committed |
@@ -159,16 +162,17 @@ against ~2,600 before it - external load suspected, not the model. A `--minutes 
    everything else survives: the next `--save` run notes `optimiser moments not restored`,
    starts with fresh Adam moments, and rewrites the file at its first checkpoint — weights
    are unaffected. Observed 2026-10-06.
+5. The pool grows ~50-60 experts (~1.5 GB) per long session; `max_disk_gb` was raised 10 -> 16 on
+   2026-10-09 (Ali's call; ceiling ~635 experts - more headroom, slower reads as the RAM hit rate drops).
 
-## State left behind (2026-10-08)
+## State left behind (2026-10-09)
 
-`weights/` = final state after the training runs (**step 155,130, 223 experts - 199 carrying
-+ 24 gated, 6,081.8 MB, 709.9M params**; held-out **0.9254** on the NEW val set after the first
-post-wiring hour - 1.1429 before it; best subject chess 0.539, worst turkce 1.589. Held-out is NOT
-comparable across the 2026-10-08 wiring: the val set changed with it). Context 3,594 of 4,096;
-`optim.npz` healthy. The corpus is now **1,048,097 files / 37,092.3M characters across 10 subjects**
-(+pg19, +turkce, supersets of wikipedia/stories/reasoning/chat-hermes, big chess 1,961.2M chars);
-read 317.7M = 0.86% of it. Old lanes backed up in `data_old_20261008/`; delete once verified.
-`data_*` intermediates kept; the web UI runs via `start.bat` (or scratch/serve_supervisor.py -
-restarts on exit, logs exit codes); the real run is simply the train command above, left alone
-for days.
+`weights/` = final state after the training runs (**step 211,535, 281 experts - 255 carrying
++ 26 gated, 7,541.8 MB, 892.4M params**; held-out **0.8594** on the new val set after the overnight
+session - 0.9254 before it; best subject chess 0.535, turkce down to 1.198). Held-out is NOT
+comparable across the 2026-10-08 wiring: the val set changed with it. Context 3,812 of 4,096;
+`optim.npz` healthy. The corpus is **1,048,097 files / 37,092.3M characters across 10 subjects**;
+read 433.2M = 1.17% of it. **Disk: 7.54 GB of the 16 GB ceiling (raised from 10 on 2026-10-09, Warts #5).** Old lanes backed up in `data_old_20261008/`; delete once verified. `data_*`
+intermediates kept; the web UI runs via `start.bat` (or scratch/serve_supervisor.py); `keepawake.py`
+at the repo root prevents sleep during long runs; the real run is simply the train command above,
+left alone for days.
