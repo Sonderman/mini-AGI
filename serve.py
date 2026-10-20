@@ -16,8 +16,10 @@ IT LEARNS WHILE YOU TALK TO IT, and this CHANGES THE WEIGHTS ON DISK. The
 exchange joins one continuous stream and the model takes an optimiser step
 every `training.chunk` characters of it - the same path minagi/stream.py
 takes through a corpus, which is why there is no second mechanism to reason
-about. Read minagi/live.py for what it costs; it is not free, and on short
-chat it is a far denser diet than documents. `--no-learn` serves read-only.
+about - at the rate training would take its next step at: the run's base
+rate times the plasticity controller's factor, where training left it. Read
+minagi/live.py for what it costs; it is not free, and on short chat it is a
+far denser diet than documents. `--no-learn` serves read-only.
 
 Binds to localhost.
 """
@@ -124,7 +126,7 @@ def _manifest(path):
         return {}
 
 
-def load(weights, device=None, learn=True, lr=3e-4, save_every=8,
+def load(weights, device=None, learn=True, lr=None, save_every=8,
          chunk=None):
     dev = torch.device(device) if device else torch.device(
         "cuda" if torch.cuda.is_available() else "cpu")
@@ -157,24 +159,17 @@ def load(weights, device=None, learn=True, lr=3e-4, save_every=8,
             model(torch.tensor([ids], device=dev))
 
     if learn:
-        from minagi.config import get as _g, load as _lc
         from minagi.live import LiveLearner
-        c = _lc()
-        STATE["learner"] = LiveLearner(
-            model, lr=lr,
-            trunk_lr_mult=_g(c, "training.trunk_lr_mult", 0.1),
-            wd=_g(c, "training.weight_decay", 0.1),
-            clip=_g(c, "training.clip", 1.0),
-            # Defaults to the granularity the corpus is read at, so talking
-            # to it and reading a book are one mechanism. That is the right
-            # default and a poor fit for a short session: at 2048 an exchange
-            # of ninety characters needs twenty-odd turns to reach one step.
-            # --learn-chunk trades that against the denser diet live.py warns
-            # about.
-            chunk=chunk or _g(c, "training.chunk", 2048),
-            save_every=save_every,
-            weights_dir=weights,
-            manifest=_manifest(weights))
+        # Set up as training is, at the rate training would step at next.
+        # The chunk defaults to the granularity the corpus is read at, so
+        # talking to it and reading a book are one mechanism. That is the
+        # right default and a poor fit for a short session: at 2048 an
+        # exchange of ninety characters needs twenty-odd turns to reach one
+        # step. --learn-chunk trades that against the denser diet live.py
+        # warns about.
+        STATE["learner"] = LiveLearner.for_run(
+            model, weights_dir=weights, manifest=_manifest(weights), lr=lr,
+            chunk=chunk, save_every=save_every)
         # The prime goes into the stream too, so the first step arrives
         # sooner. Kept SHORTER than a chunk on purpose: long enough to
         # advance the counter, short enough that it never takes a step by
@@ -182,12 +177,15 @@ def load(weights, device=None, learn=True, lr=3e-4, save_every=8,
         if PRIME:
             STATE["learner"].feed(PRIME[-(STATE["learner"].chunk - 1):],
                                   STATE["tok"], note="prime")
-        ch = STATE["learner"].chunk
-        left = max(0, ch - STATE["learner"].pending)
+        ln = STATE["learner"]
+        ch = ln.chunk
+        left = max(0, ch - ln.pending)
+        base = ln.opt.param_groups[-1]["base_lr"]
         print(f"[learning] on - one step per {ch} characters, "
               f"{left} to the first (about {max(1, round(left / 93))} "
-              f"exchanges), saved to {weights}/ every {save_every} steps",
-              file=sys.stderr)
+              f"exchanges), at the run's rate: {base:g} x{ln.factor():.4f} "
+              f"= {base * ln.factor():.3g}; saved to {weights}/ every "
+              f"{save_every} steps", file=sys.stderr)
     return model
 
 
@@ -838,8 +836,11 @@ def main():
     ap.add_argument("--no-learn", dest="learn", action="store_false",
                     help="serve without learning. The weights are then opened "
                          "read-only and nothing is written back")
-    ap.add_argument("--learn-lr", type=float, default=3e-4,
-                    help="learning rate for the live stream")
+    ap.add_argument("--learn-lr", type=float, default=None,
+                    help="the base rate the live stream learns at, which "
+                         "the plasticity controller scales as it does in "
+                         "training. Defaults to the base the training run "
+                         "used, then training.lr in config.yaml")
     ap.add_argument("--prime-chars", type=int, default=1024,
                     help="characters of corpus to open the conversation "
                          "with, so the router has something to choose "

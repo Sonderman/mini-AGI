@@ -56,9 +56,10 @@ import torch
 import torch.nn as nn
 
 from minagi.recur import RecurConfig, RecurCoder, load_recur
-from minagi.pool import PooledMLP, AutoGrow
+from minagi.pool import PooledMLP, AutoGrow, split_trunk_pool
 from minagi.stream import StreamSet, Evaluator, detach_caches, ramp_context
 from minagi.plasticity import Plasticity
+from minagi.lanes import LaneSchedule
 from minagi.optim import GradSNR
 from minagi import heldout
 from minagi import store as weights_store
@@ -565,6 +566,34 @@ def _lanes(files, seed, roots=None, resume=0):
             for j, k in enumerate(sorted(by))]
 
 
+def _lane_weights(spec, names):
+    """
+    Fixed weights for the subjects, from "subject=weight,..." or a mapping,
+    each weight above 0 and at most 1; a subject not named weighs 1. Empty
+    when nothing is set - and then the schedule decides (minagi/lanes.py).
+    A subject at 0.25 gets a quarter of the reading of one at 1.
+    """
+    if isinstance(spec, dict):
+        pairs = list(spec.items())
+    else:
+        pairs = [p.split("=", 1) for p in str(spec or "").split(",")
+                 if p.strip()]
+    weights = {}
+    for pair in pairs:
+        if len(pair) != 2:
+            raise SystemExit(f"--lane-weights: {'='.join(pair)!r} is not "
+                             f"subject=weight")
+        name, w = str(pair[0]).strip(), float(pair[1])
+        if name not in names:
+            raise SystemExit(f"--lane-weights names {name!r}, which is not a "
+                             f"subject here: {', '.join(names)}")
+        if not 0 < w <= 1:
+            raise SystemExit(f"--lane-weights: {name} at {w:g} - a weight is "
+                             f"above 0 and at most 1")
+        weights[name] = w
+    return weights
+
+
 def _truncate_history(path, chars):
     """Drop history rows past `chars` - they belong to a branch that was
     abandoned, and every reader of this file assumes it moves forward."""
@@ -828,14 +857,34 @@ def cmd_read(args):
     # The check as it was read before checks were spread, from the top of
     # each subject, is read as well, so the log says how far those sat from
     # this level.
-    level, held = {}, None
+    level, held, parts = {}, None, None
     if ev is not None:
         v = ev.run(eval_steps, spread=True); se = v.pop("stderr", 0.0)
         before = float(np.mean(list(v.values())))
         c = ev.run(sample_eval_steps, spread=True); c.pop("stderr", None)
         top = ev.run(sample_eval_steps); top.pop("stderr", None)
         level = {k: v[k] - c[k] for k in v if k in c}
-        held = (dict(v), c, top)
+        # The first session to count whole blocks only reads the old blocks
+        # too, once, so the log can move everything before it onto the new
+        # level (minagi/heldout.py, part_shift).
+        try:
+            with open(args.sample_log, errors="ignore") as f:
+                counted = heldout.part_shift(f.read()) is not None
+        except (OSError, TypeError):
+            counted = True               # no log: nothing before to move
+        if not counted and args.sample_every:
+            old = FolderEvaluator(model, args.held_out, args.chunk, cfg.block,
+                                  device, whole=False)
+            parts = old.run(eval_steps, spread=True)
+            parts.pop("stderr", None)
+            print(f"  held-out now counts whole blocks only: {before:.4f}; "
+                  f"with each file's leftover part-block, as before, "
+                  f"{np.mean(list(parts.values())):.4f} - the log draws "
+                  f"earlier checks moved by the difference, subject by "
+                  f"subject")
+            # the best this run has seen was read on the old blocks too
+            best_val -= float(np.mean(list(parts.values()))) - before
+        held = (dict(v), c, top, parts)
         print(f"  before: {before:.4f} +/-{se:.4f} on {args.held_out}, "
               f"{-(-eval_steps // ev.per)} blocks of each subject spread "
               f"over all of it")
@@ -1008,6 +1057,35 @@ def cmd_read(args):
     # One lane per subject, rotated a window at a time.
     lanes = _lanes(files, args.shuffle_seed, args.paths,
                    resume=int(man.get("read_chars", 0) or 0))
+    # WHICH SUBJECT NEXT - minagi/lanes.py. By default the share each gets
+    # follows where reading still lowers held-out most, read off the run's
+    # own checks; fixed weights pin it; `equal` is the old even rotation.
+    fixed = _lane_weights(getattr(args, "lane_weights", ""),
+                          [l.name for l in lanes])
+    mode = "fixed" if fixed else getattr(args, "lane_schedule", "auto")
+    sizes = {l.name: sum(os.path.getsize(p) for p in l.paths
+                         if os.path.exists(p)) for l in lanes}
+    sched = LaneSchedule.restore(
+        (man or {}).get("lanes"), [l.name for l in lanes], sizes,
+        list(ev.groups) if ev is not None else [], mode=mode, weights=fixed,
+        total=float(man.get("read_chars", 0) or 0))
+    if parts is not None:
+        # the level held-out is read at has just moved: fit again from the
+        # log, which draws everything before on the new level
+        sched.fits, sched.last = {}, None
+    if (mode == "auto" and not sched.fits and args.sample_log
+            and os.path.exists(args.sample_log)):
+        # nothing saved yet: the log holds every check the run has made
+        from minagi.heldout import parse_log
+        try:
+            sched.bootstrap(parse_log(args.sample_log))
+            if sched.fits:
+                print(f"  reading shares: fits seeded from the checks in "
+                      f"{args.sample_log}", flush=True)
+        except OSError:
+            pass
+    print(f"  {sched.describe()}", flush=True)
+    lane_of = {l.name: l for l in lanes}
     # How long a subject is read for before the next one. It is a whole
     # number of context windows - a window never spans two subjects, because
     # attention across the seam where chess becomes Python teaches nothing -
@@ -1104,6 +1182,12 @@ def cmd_read(args):
                            extra={"read_chars": base_chars + seen,
                                   "read_nats": nats,
                                   "plasticity": plast.state(),
+                                  "lanes": sched.state(),
+                                  # the base the controller scales, so a
+                                  # stream that carries this run on - chat,
+                                  # a test read while learning - steps at
+                                  # the run's own rate (minagi/live.py)
+                                  "lr": args.lr,
                                   "context_now": ctx_now})
         log_history(val)
 
@@ -1197,13 +1281,15 @@ def cmd_read(args):
     # score swung by two nats depending on which subject the reader happened
     # to be inside.
     while not stop and seen < target:
-        for lane in lanes:
+        # one visit at a time, to the subject the schedule picks next
+        for lane in (lane_of[sched.pick()],):
             r = lane.open(model, args.chunk, ctx_now, device,
                           turn * args.chunk)
             if r is None:
                 continue
             path, data = r.name, r.data
             fl = []
+            visit_from = seen
             for j in range(turn):
                 if r.done():
                     break
@@ -1286,6 +1372,10 @@ def cmd_read(args):
                         # at the level the start measured - see `level`
                         d = {k: x + level.get(k, 0.0) for k, x in d.items()}
                         v_ = float(np.mean(list(d.values())))
+                        sched.observe(base_chars + seen, d)
+                        moved_share = sched.step()
+                        if moved_share:
+                            print(f"    {moved_share}", flush=True)
                         # The generalisation gap, kept for the growth
                         # decision. It is the thing the density ceiling was
                         # always a proxy for, and unlike density it is
@@ -1459,6 +1549,7 @@ def cmd_read(args):
                           f"({seen/1e6:.1f}M characters)", flush=True)
                 stop = True
             lane.rest(model)               # the window is done; free its cache
+            sched.note_read(lane.name, seen - visit_from)
             if fl:
                 losses.append(float(np.mean(fl)))
                 if args.verbose:
@@ -1514,6 +1605,12 @@ def cmd_read(args):
                            extra={"read_chars": base_chars + seen,
                                   "read_nats": nats,
                                   "plasticity": plast.state(),
+                                  "lanes": sched.state(),
+                                  # the base the controller scales, so a
+                                  # stream that carries this run on - chat,
+                                  # a test read while learning - steps at
+                                  # the run's own rate (minagi/live.py)
+                                  "lr": args.lr,
                                   "context_now": ctx_now})
         print(f"  weights/ updated - the model has read this and kept it")
     else:
@@ -1930,30 +2027,9 @@ def write_samples(path, step, chars, minutes, samples, val=None, se=None,
     return path
 
 def _split_trunk_pool(model):
-    """
-    Which parameters are the pool's, and which are the shared body.
-
-    A resident pool keeps its experts as modules; a paged pool keeps three
-    stacked slot tensors instead, so the set has to be found by asking the
-    pool rather than by walking a ModuleList that is not there.
-    """
-    p = model.pool
-    ids = {id(p.gate)}
-    if hasattr(p, "experts") and p.experts is not None:
-        ids |= {id(q) for e in p.experts for q in e.parameters()}
-    for nm in ("w1", "w3", "w2"):
-        obj = getattr(p, nm, None)
-        if obj is None:
-            continue
-        ids |= ({id(obj)} if torch.is_tensor(obj)
-                else {id(q) for q in obj.parameters()})
-    for s in model.modules():
-        if isinstance(s, PooledMLP):
-            ids.add(id(s.router.weight))
-            ids.add(id(s.depth_emb))
-    trunk = [q for q in model.parameters() if id(q) not in ids]
-    pool = [q for q in model.parameters() if id(q) in ids]
-    return trunk, pool
+    """Which parameters are the pool's, and which are the shared body -
+    minagi/pool.py, where every learner finds the same split."""
+    return split_trunk_pool(model)
 
 
 def build_paged(wdir, device, resident=None, ram_capacity=256, ceiling=None,
@@ -2201,6 +2277,17 @@ def main():
                          "it a chunk at a time. Distinct from model.context_end, "
                          "which is how far the model sees and how far the "
                          "gradient reaches")
+    rd.add_argument("--lane-schedule", choices=("auto", "equal"),
+                    default=_cfg(_c, "data.lane_schedule", "auto") or "auto",
+                    help="how the reading is shared between subjects: auto "
+                         "follows where reading still lowers held-out most "
+                         "(minagi/lanes.py); equal is the even rotation")
+    rd.add_argument("--lane-weights",
+                    default=_cfg(_c, "data.lane_weights", "") or "",
+                    help="subject=weight,... - pins each subject's share of "
+                         "the reading against the others', above 0 and at "
+                         "most 1 (unlisted subjects weigh 1), in place of the "
+                         "automatic schedule")
     rd.add_argument("--context-end", "--context", dest="context", type=int,
                     default=_cfg(_c, "model.context_end",
                                  _cfg(_c, "model.context", 24576)),

@@ -128,8 +128,11 @@ def main():
                     label=d if g == segs[0] else None)
     frame(ax, "Which domains are moving", "held-out per domain, nats")
     ax.set_yscale("log")
+    # The subjects sit between powers of ten, so a log axis that labels only
+    # those (0.1, 1) labels nothing here: the ticks between them carry the
+    # numbers, as in the panel beside it.
     ax.yaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
-    ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    ax.yaxis.set_minor_formatter(matplotlib.ticker.ScalarFormatter())
     if names:
         ax.legend(fontsize=7, frameon=False, ncol=2, loc="best")
 

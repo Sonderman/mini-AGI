@@ -30,6 +30,19 @@ stated rather than assumed away.
 A smaller learning rate is not the fix. Descent has a direction, and on the
 model's own argmax that direction is to confirm it; a lower rate confirms it
 more slowly.
+
+THE RATE IS THE RUN'S. Whatever the stream is - a conversation, or a test
+set read while learning - it continues the stream training reads, so it
+continues training's rate as well: the base rate times the plasticity
+controller's factor (minagi/plasticity.py), both restored from the weights,
+with every newborn expert at its own multiple of that, as in training. The
+controller moves only at a held-out check, and this stream takes none, so the
+factor stays where training left it; the steps it took are saved back. A flat
+3e-4, as this once used, was ~35 times the rate training had come down to.
+And a save writes back everything the weights directory carried that this
+does not own - the controller's state, the reading shares - where it once
+rebuilt the manifest without them, and the next training session started at
+the full rate.
 """
 
 import time
@@ -40,11 +53,20 @@ from .precision import amp
 
 
 class LiveLearner:
-    """One optimiser, and one step per `chunk` characters of the stream."""
+    """One optimiser, and one step per `chunk` characters of the stream, at
+    the rate training would take its next step at. `lr` is the base rate the
+    controller scales, as train.py's --lr is."""
+
+    # what minagi/store.py writes into a manifest itself; everything else a
+    # manifest holds is carried through a save untouched
+    OWN = ("step", "val", "cfg", "telemetry", "n_experts", "d_model", "d_ff",
+           "paged", "core_tensors", "router_tensors", "experts",
+           "total_bytes")
 
     def __init__(self, model, lr=3e-4, trunk_lr_mult=0.2, wd=0.1, clip=1.0,
                  aux_weight=0.0, save_every=8, weights_dir=None, manifest=None,
-                 chunk=512, context=None):
+                 chunk=512, context=None, newborn_lr=False,
+                 newborn_half=15000.0):
         self.model = model
         # What the model was loaded as. save() writes the manifest that names
         # every tensor's shape, and without this it writes an empty one: the
@@ -59,6 +81,14 @@ class LiveLearner:
         self.steps = 0
         self.unsaved = 0
         self.log = []
+        # the controller, where training left it, and how far the stream had
+        # got: a save carries both on by what was learned here
+        from .plasticity import Plasticity
+        self.plast = Plasticity.restore(self.manifest.get("plasticity"))
+        self.step0 = int(self.manifest.get("step") or 0)
+        self.chars0 = float(self.manifest.get("read_chars") or 0)
+        self.nats0 = float(self.manifest.get("read_nats") or 0.0)
+        self.chars, self.nats = 0, 0.0
         # the stream. `buf` holds the last `context` character ids and nothing
         # older; `pending` counts characters read since the last step.
         self.chunk = int(chunk)
@@ -66,10 +96,17 @@ class LiveLearner:
         self.buf = []
         self.pending = 0
         dev = next(model.parameters()).device
-        trunk = [p for n, p in model.named_parameters()
-                 if not n.startswith("pool.")]
-        pool_ps = [p for n, p in model.named_parameters()
-                   if n.startswith("pool.")]
+        if getattr(model, "pool", None) is not None:
+            # training's own split: the router rows and the depth embedding
+            # are the pool's, at its rate and each newborn's own - split by
+            # name they went to the trunk and learned at its tenth
+            from .pool import split_trunk_pool
+            trunk, pool_ps = split_trunk_pool(model)
+        else:
+            trunk = [p for n, p in model.named_parameters()
+                     if not n.startswith("pool.")]
+            pool_ps = [p for n, p in model.named_parameters()
+                       if n.startswith("pool.")]
         self.opt = torch.optim.AdamW(
             [{"params": trunk, "name": "trunk", "weight_decay": wd,
               "lr": lr * trunk_lr_mult, "base_lr": lr * trunk_lr_mult},
@@ -79,6 +116,11 @@ class LiveLearner:
         pool = getattr(model, "pool", None)
         if pool is not None and hasattr(pool, "attach_optimiser"):
             pool.attach_optimiser(self.opt)
+        if pool is not None and hasattr(pool, "newborn_rate"):
+            # newborn experts at their own multiple of the main rate, as
+            # training runs them (training.newborn_lr)
+            pool.newborn_rate = bool(newborn_lr)
+            pool.rate_half = float(newborn_half)
         # ADAM'S MOMENTS carry on from where the weights directory left them,
         # as they do when the trainer resumes. A fresh optimiser would start
         # every tensor from zero moments at the first step - the trunk's and
@@ -129,13 +171,32 @@ class LiveLearner:
         recs = self.feed(text, tok, note=note)
         return recs[-1] if recs else None
 
-    def _step(self, note=""):
-        """One optimiser step on the window as it stands."""
-        ids = self.buf
+    def factor(self):
+        """The controller's factor on the base rate, as training applies it."""
+        return self.plast.factor()
+
+    def step_on(self, ids, note=""):
+        """One optimiser step on exactly `ids`, outside the stream's window:
+        for text read in pieces, each learned from alone."""
+        return self._step(note, ids=list(ids), new=len(ids) - 1)
+
+    def _step(self, note="", ids=None, new=None):
+        """One optimiser step on the window as it stands. `new` is how many
+        of its characters the stream had not read before - a chunk."""
+        ids = self.buf if ids is None else ids
+        new = self.chunk if new is None else int(new)
         if len(ids) < 8:
             return None
         dev = next(self.model.parameters()).device
         was_training = self.model.training
+        # the rate training would step at now: base times the controller's
+        # factor, and every newborn expert its own multiple of that
+        scale = self.plast.factor()
+        pool = getattr(self.model, "pool", None)
+        if pool is not None and hasattr(pool, "main_scale"):
+            pool.main_scale = scale
+        for g in self.opt.param_groups:
+            g["lr"] = g.get("base_lr", g["lr"]) * scale
         self.model.train()
         try:
             with amp(dev):
@@ -156,8 +217,14 @@ class LiveLearner:
                 self.model.eval()
         self.steps += 1
         self.unsaved += 1
+        self.plast.tick()
+        self.chars += new
+        self.nats += float(loss) * new
+        if pool is not None and hasattr(pool, "now"):
+            pool.now = self.step0 + self.steps   # the clock training keeps
         rec = {"step": self.steps, "chars": len(ids), "loss": float(loss),
-               "grad_norm": gn, "note": note, "at": time.time()}
+               "grad_norm": gn, "lr": self.opt.param_groups[-1]["lr"],
+               "scale": scale, "note": note, "at": time.time()}
         self.log.append(rec)
         return rec
 
@@ -176,15 +243,53 @@ class LiveLearner:
             mc = getattr(self.model, "cfg", None)
             cfg = asdict(mc) if is_dataclass(mc) else (dict(mc.__dict__)
                                                        if mc else None)
-        keep = {k: self.manifest[k] for k in ("read_chars", "context_now")
-                if k in self.manifest}
+        pool = getattr(self.model, "pool", None)
+        if pool is not None and hasattr(pool, "relax_rates"):
+            # newborn rates come down by what each expert was trained, as
+            # training brings them down at its checks
+            pool.relax_rates()
+        # everything the directory carried that the store does not write
+        # itself - the controller, the reading shares, the base rate - and
+        # the stream carried on by what was read here
+        keep = {k: v for k, v in self.manifest.items() if k not in self.OWN}
+        keep.update(self.progress())
         keep.update(extra or {})
         weights_store.save(self.model, self.weights_dir, opt=self.opt,
-                           step=self.manifest.get("step"),
+                           step=self.step0 + self.steps,
                            val=self.manifest.get("val"),
                            cfg=cfg, extra=keep)
         self.unsaved = 0
         return True
+
+    def progress(self):
+        """Where the stream is now, as the manifest keeps it."""
+        return {"read_chars": int(self.chars0 + self.chars),
+                "read_nats": self.nats0 + self.nats,
+                "plasticity": self.plast.state()}
+
+    @classmethod
+    def for_run(cls, model, weights_dir=None, manifest=None, lr=None,
+                chunk=None, context=None, save_every=8, config=None):
+        """A learner set up as training is: config.yaml's training settings,
+        the base rate the run itself used (the manifest's `lr`, which train.py
+        writes) unless `lr` says otherwise, and the controller where the run
+        left it."""
+        from .config import get, load
+        c = config if config is not None else load()
+        man = dict(manifest or {})
+        base = (float(lr) if lr is not None
+                else float(man.get("lr") or get(c, "training.lr", 3e-4)))
+        return cls(model, lr=base,
+                   aux_weight=float(getattr(getattr(model, "cfg", None),
+                                            "pool_aux", 0.0) or 0.0),
+                   trunk_lr_mult=get(c, "training.trunk_lr_mult", 0.1),
+                   wd=get(c, "training.weight_decay", 0.1),
+                   clip=get(c, "training.clip", 1.0),
+                   chunk=chunk or get(c, "training.chunk", 2048),
+                   context=context, save_every=save_every,
+                   weights_dir=weights_dir, manifest=man,
+                   newborn_lr=bool(get(c, "training.newborn_lr", False)),
+                   newborn_half=float(get(c, "training.newborn_half", 15000)))
 
 
 def exchange_text(user_text, bot_text, u0="<user>", u1="</user>",

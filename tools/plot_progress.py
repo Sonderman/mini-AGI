@@ -25,9 +25,7 @@ from minagi import heldout                                  # noqa: E402
 
 # The header gained the corpus total partway through the project, so both
 # shapes appear in one file and the older half is the early history.
-HEAD = re.compile(
-    r"^step ([\d,]+)\s+([\d.]+)M (?:of ([\d,]+)M )?characters"
-    r"[^\n]*?(\d+) min(?:\s+(\d+) experts)?", re.M)
+HEAD = heldout.LOG_HEAD
 
 
 DYING_AT, SURVIVAL_CHARS, CHUNK = 0.75, 0, 1536
@@ -77,71 +75,9 @@ def _dead_pct(r):
 
 
 def parse(path):
-    """Every entry in a sample log, oldest first, with held-out on one level.
-
-    Checks moved to blocks spread over the whole held-out set partway through
-    the run (minagi/heldout.py). An entry from before that read the top of
-    each subject, and sits away from the level checks report at now by what
-    the first spread session start measured: it is moved by that much,
-    subject by subject, and marked `shifted`. The larger evaluation a session
-    ended on before then was a third measurement, neither the checks' nor
-    the new level, and is left out - only a check writes the controller's
-    evidence line, so once a log has one, an entry before the change without
-    it is one of those. After the change that evaluation is the level itself
-    and stays.
-    """
-    txt = open(path, errors="ignore").read()
-    first = heldout.first_shift(txt)
-    rows, had_check = [], False
-    heads = list(HEAD.finditer(txt))
-    for i, m in enumerate(heads):
-        end = heads[i + 1].start() if i + 1 < len(heads) else len(txt)
-        blk = txt[m.end():min(m.end() + 700, end)]
-        r = {"step": int(m.group(1).replace(",", "")),
-             "chars": float(m.group(2)),
-             "corpus": (float(m.group(3).replace(",", ""))
-                        if m.group(3) else None),
-             "min": int(m.group(4)),
-             "experts": int(m.group(5)) if m.group(5) else None}
-        g = re.search(r"context ([\d,]+) characters", blk)
-        r["context"] = int(g.group(1).replace(",", "")) if g else None
-        g = re.search(r"reading ([\d,]+) char/s", blk)
-        r["rate"] = int(g.group(1).replace(",", "")) if g else None
-        g = re.search(r"train loss ([\d.]+)", blk)
-        r["train"] = float(g.group(1)) if g else None
-        g = re.search(r"lr ([\d.e+-]+)", blk)
-        r["lr"] = float(g.group(1)) if g else None
-        g = re.search(r"evidence t ([+-][\d.]+) over (\d+)", blk)
-        r["evidence"] = float(g.group(1)) if g else None
-        r["evidence_n"] = int(g.group(2)) if g else None
-        g = re.search(r"\(effect ([+-][\d.]+)\)", blk)
-        r["effect"] = float(g.group(1)) if g else None
-        g = re.search(r"grad norm ([\d.]+)", blk)
-        r["gnorm"] = float(g.group(1)) if g else None
-        g = re.search(r"held-out loss ([\d.]+) \+/-([\d.]+)", blk)
-        if g:
-            r["val"], r["se"] = float(g.group(1)), float(g.group(2))
-        g = re.search(r"^  ([a-z_]+ [\d.]+(?:   [a-z_]+ [\d.]+)*)\s*$", blk, re.M)
-        if g:
-            parts = g.group(1).split()
-            r["dom"] = {parts[i]: float(parts[i + 1])
-                        for i in range(0, len(parts) - 1, 2)}
-        if first is None or m.start() < first[0]:
-            check = heldout.is_check(blk)
-            if had_check and not check:
-                continue
-            had_check = had_check or check
-            if first is not None and r.get("val") is not None:
-                r["val"], dom = heldout.moved(r["val"], r.get("dom"),
-                                              first[1])
-                if dom is not None:
-                    r["dom"] = dom
-                r["shifted"] = True
-        rows.append(r)
-    corpus = next((r["corpus"] for r in reversed(rows) if r["corpus"]), None)
-    for r in rows:
-        r["corpus"] = r["corpus"] or corpus
-    return rows
+    """Every entry in a sample log, oldest first, with held-out on one level
+    - minagi/heldout.py parse_log, which the trainer reads the log with too."""
+    return heldout.parse_log(path)
 
 
 

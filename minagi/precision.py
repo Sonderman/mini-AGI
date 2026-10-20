@@ -231,6 +231,15 @@ def unpack_bf16(a):
     return t.to(torch.float32)
 
 
+def as_bf16(a):
+    """A stored moment as a bfloat16 tensor: pack_bf16's int16 bits viewed as
+    what they are, or a float array narrowed as pack_bf16 would narrow it."""
+    t = torch.as_tensor(a)
+    if t.dtype == torch.int16:
+        return t.view(torch.bfloat16)
+    return t.to(torch.bfloat16)
+
+
 def is_moment(name):
     """Whether a saved array is an Adam moment rather than a weight.
 

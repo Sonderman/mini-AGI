@@ -68,9 +68,12 @@ all; parking an expert that was stepped carries its moments back with its
 weights.
 """
 
+import atexit
 import math
 import os
+import queue
 import struct
+import threading
 import weakref
 import zipfile
 from collections import OrderedDict
@@ -81,7 +84,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from numpy.lib import format as npy
 
-from .precision import is_moment, pack_bf16, unpack_bf16
+from .precision import as_bf16, is_moment, pack_bf16
 
 _WEIGHTS = ("w1", "w3", "w2")
 _MOMENTS = ("w1_m", "w3_m", "w2_m", "w1_v", "w3_v", "w2_v")
@@ -181,10 +184,20 @@ class Tiers:
 
     An expert that was trained while resident is marked dirty and written back
     to disk on eviction. Otherwise the file on disk is still the truth.
+
+    WRITTEN BEHIND. The write happens on a thread of its own: an eviction is
+    made in the middle of a forward, while the card waits for the experts it
+    admitted, and a file written there kept it waiting - 13.5% of a reading
+    step at a RAM hit rate of 0.72, 3.4% at 0.87, and more again as the pool
+    outgrows the RAM tier. Until its write lands, an evicted expert stays in
+    `pending`, and a fetch serves it from there - so nothing reads a file
+    older than the expert, and the writes of one expert land in the order
+    they were made. flush() and anything that deletes files wait for the
+    writer first.
     """
 
     def __init__(self, path, d_model, d_ff, ram_capacity=256, device="cpu",
-                 read_only=False):
+                 read_only=False, write_behind=True):
         self.path = path
         self.d_model, self.d_ff = d_model, d_ff
         self.ram = OrderedDict()             # id -> dict of CPU tensors
@@ -198,6 +211,10 @@ class Tiers:
         self.read_only = read_only
         self.dirty = set()
         self.reads = self.hits = self.evictions = self.writebacks = 0
+        self.write_behind = write_behind
+        self.pending = {}            # id -> entry the writer has yet to land
+        self._lock = threading.Lock()
+        self._q = self._writer = self._error = None
 
     def _file(self, i):
         return os.path.join(self.path, "e%05d.npz" % i)
@@ -220,9 +237,13 @@ class Tiers:
         out = {k: torch.from_numpy(z[k]) for k in _WEIGHTS}
         for k in _MOMENTS:
             if k in z:
-                # bf16 if this file has been written since the moments were
-                # narrowed, fp32 if it has not; unpack_bf16 reads both
-                out[k] = unpack_bf16(z[k])
+                # Kept as the file keeps them, bfloat16: half the memory of
+                # fp32, so the RAM tier holds half as many again in the same
+                # space, and half the copy to the card, where the optimiser
+                # widens them (_own_moments). A file from before the moments
+                # were narrowed holds fp32, narrowed here as its next write
+                # would narrow it.
+                out[k] = as_bf16(z[k])
         return out
 
     def fetch(self, i, count=True):
@@ -235,8 +256,15 @@ class Tiers:
             self.hits += count
             self.ram.move_to_end(i)
             return self.ram[i]
-        self.reads += count
-        e = self._from_disk(i)
+        with self._lock:
+            e = self.pending.get(i)
+        if e is not None:
+            # evicted a moment ago and still on its way to disk: what is
+            # being written is the latest it has, and it is still in memory
+            self.hits += count
+        else:
+            self.reads += count
+            e = self._from_disk(i)
         self.ram[i] = e
         self.ram.move_to_end(i)
         self._trim()
@@ -255,8 +283,49 @@ class Tiers:
             j, ent = self.ram.popitem(last=False)      # least recently used
             self.evictions += 1
             if j in self.dirty:
-                self._to_disk(j, ent)
                 self.dirty.discard(j)
+                if self.write_behind:
+                    self._write_later(j, ent)
+                else:
+                    self._to_disk(j, ent)
+
+    def _write_later(self, i, ent):
+        """Hand an evicted expert to the writer. At most 16 wait at once - the
+        disk sets the pace when it cannot keep up, and memory stays bounded."""
+        if self._error is not None:
+            self.drain()                     # raises what the writer raised
+        if self._writer is None:
+            self._q = queue.Queue(maxsize=16)
+            self._writer = threading.Thread(target=self._write_loop,
+                                            name="expert-writer", daemon=True)
+            self._writer.start()
+            # a run that ends without a flush still lands what it evicted
+            atexit.register(self.drain)
+        with self._lock:
+            self.pending[i] = ent
+        self._q.put((i, ent))
+
+    def _write_loop(self):
+        while True:
+            i, ent = self._q.get()
+            try:
+                self._to_disk(i, ent)
+            except BaseException as e:   # noqa: BLE001 - drain re-raises it
+                self._error = e
+            finally:
+                with self._lock:
+                    if self.pending.get(i) is ent:
+                        del self.pending[i]
+                self._q.task_done()
+
+    def drain(self):
+        """Wait until every write handed to the writer has landed, and raise
+        whatever it raised."""
+        if self._q is not None:
+            self._q.join()
+        if self._error is not None:
+            e, self._error = self._error, None
+            raise e
 
     def _to_disk(self, i, ent):
         if self.read_only:
@@ -276,6 +345,9 @@ class Tiers:
     def flush(self):
         if self.read_only:
             return
+        # the writer first: an older write of an expert still queued would
+        # otherwise land after the newer one written here
+        self.drain()
         for i in list(self.dirty):
             self._to_disk(i, self.ram[i])
         self.dirty.clear()
@@ -864,13 +936,19 @@ class PagedPool(nn.Module):
         holds. An entry replaces the old one whole, so it never leaves them out.
         """
         tensors = ((self.w1, "w1"), (self.w3, "w3"), (self.w2, "w2"))
-        ent = {nm: p.data[s].detach().to("cpu").clone() for p, nm in tensors}
+        # One copy each: off the card, the move is the copy, and a clone of
+        # it would copy every byte a second time. copy=True keeps it a copy
+        # on the CPU too, where .to would hand back the slot itself.
+        ent = {nm: p.data[s].detach().to("cpu", copy=True) for p, nm in tensors}
         if self._own[s]:
             for p, nm in tensors:
                 o = st.get(p)
                 if o and "exp_avg" in o:
-                    ent[nm + "_m"] = o["exp_avg"][s].to("cpu").clone()
-                    ent[nm + "_v"] = o["exp_avg_sq"][s].to("cpu").clone()
+                    # narrowed on the card, so half the bytes cross the bus
+                    ent[nm + "_m"] = o["exp_avg"][s].to(torch.bfloat16).to(
+                        "cpu", copy=True)
+                    ent[nm + "_v"] = o["exp_avg_sq"][s].to(torch.bfloat16).to(
+                        "cpu", copy=True)
         else:
             ent.update({k: v for k, v in
                         self.tiers.fetch(self._f(e), count=False).items()
@@ -917,8 +995,12 @@ class PagedPool(nn.Module):
             src = self.tiers.fetch(self._f(e), count=False)
             for nm, o in zip(names, sts):
                 if nm + "_m" in src:
-                    o["exp_avg"][s].copy_(src[nm + "_m"])
-                    o["exp_avg_sq"][s].copy_(src[nm + "_v"])
+                    # across at the width RAM keeps them and widened on the
+                    # card: copy_ from the CPU with a dtype change would widen
+                    # them first and send twice the bytes
+                    dev = o["exp_avg"].device
+                    o["exp_avg"][s].copy_(src[nm + "_m"].to(dev))
+                    o["exp_avg_sq"][s].copy_(src[nm + "_v"].to(dev))
                 else:
                     o["exp_avg"][s].zero_()
                     o["exp_avg_sq"][s].zero_()
@@ -1255,6 +1337,10 @@ class PagedPool(nn.Module):
         # renumbered the directory would cost up to n renames for one deletion,
         # and every record ever written by position - expert_history.jsonl
         # included - would silently stop meaning what it said.
+        #
+        # The writer lands everything first, or a write still queued for an
+        # expert deleted here would put its file back.
+        self.tiers.drain()
         for i in range(self._n):
             if i not in kept:
                 u = self._f(i)

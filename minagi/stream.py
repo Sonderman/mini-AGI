@@ -350,15 +350,28 @@ class FolderEvaluator:
     wikipedia file and about one reasoning trace of 400, and the first 30,720
     characters of a subject and the next 92,160 differed by 0.12 in one
     subject and by 0.10 the other way in another.
+
+    WHOLE BLOCKS ONLY. A file seldom ends on a block boundary, and what is
+    left after its last whole block used to be a block of its own - however
+    short. A chunk's loss is a mean over its characters and a subject's is a
+    mean over its chunks, so a 68-character leftover counted as much as 2,048
+    characters, all of them predicted from almost no context. Three short
+    chunks (73, 68 and 32 characters) were 21% of chat_hermes's check, which
+    read ~1.0 nats against 0.74 for the subject, with a noise of 0.025 a check
+    against 0.002 before. With every block whole, every chunk is the same
+    length. `whole=False` keeps the old blocks, for measuring what that
+    change moved; a subject with no whole block at all keeps its pieces.
     """
 
-    def __init__(self, model, root, chunk, context, device, per_domain=True):
+    def __init__(self, model, root, chunk, context, device, per_domain=True,
+                 whole=True):
         from minagi.ingest import collect, as_stream
         self._as_stream = as_stream
         self.model, self.chunk, self.context = model, chunk, context
         self.device = device
         self.per = max(1, context // chunk)       # chunks between cache clears
         self.block = chunk * self.per
+        self.whole = whole
         self._blocks = {}            # subject -> every (file, start), on demand
         self._picked = {}            # (subject, n) -> the blocks' characters
         self.groups = {}
@@ -371,17 +384,23 @@ class FolderEvaluator:
             self.groups["all"] = collect([root])
 
     def blocks(self, name):
-        """Every block of one subject in reading order, as (file, start): the
-        blocks reading it from the top would score, from the same files."""
+        """Every whole block of one subject in reading order, as (file,
+        start): the blocks reading it from the top would score, from the same
+        files, leaving out what is left of each file after its last whole
+        block (see WHOLE BLOCKS ONLY)."""
         if name not in self._blocks:
-            out = []
+            out, whole = [], []
             for f in self.groups[name]:
                 n = len(self._as_stream(f))
                 if n < 8:                # reading from the top skips these too
                     continue
                 # a block needs a first chunk of two characters to score
                 out.extend((f, s) for s in range(0, n - 2, self.block))
-            self._blocks[name] = out
+                # a whole block is `per` full chunks: its characters and
+                # one past them, the target of its last
+                whole.extend((f, s) for s in range(0, n - self.block,
+                                                   self.block))
+            self._blocks[name] = whole if (self.whole and whole) else out
         return self._blocks[name]
 
     def spread(self, name, n):

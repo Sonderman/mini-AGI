@@ -73,7 +73,7 @@ pool:
   # VRAM holds what the current forward admitted. Only VRAM is scarce.
   resident: 32            # experts one forward may use - the card's slots, each
                           # holding weights, gradient and Adam's moments
-  ram_cache: 96           # RAM - experts kept in system memory
+  ram_cache: 288          # RAM - experts kept in system memory (~25 MB each)
 
   capacity_factor: 0      # most of a batch one expert may take, as a multiple
                           # of its fair share; the rest is dropped. 0 removes
@@ -188,6 +188,16 @@ data:
   # Each sub-folder of `train` is a subject, and reading rotates between them.
   # A window never spans two subjects, but a subject may take several in a row.
   passage: 32768          # characters read from one file before moving on
+
+  # How the reading is shared between subjects. auto: each subject's share
+  # follows where reading still lowers held-out most, read off the run's own
+  # checks (minagi/lanes.py) - no subject below a quarter of an even share or
+  # above three times one, moving a few percent a check. equal: the even
+  # rotation every subject used to get, whatever its size.
+  lane_schedule: auto
+  # Fixed weights pin the shares instead, e.g. {self-knowledge: 0.25}: each
+  # above 0 and at most 1, unlisted subjects at 1.
+  lane_weights: {}
 
 decoding:
   # Generation is greedy - no random numbers - so two samples taken at the

@@ -23,6 +23,14 @@ and whatever draws or reports held-out reads them: a check logged before the
 first of these banners was read from the top, and is moved onto the new level
 by the difference that banner measured, subject by subject.
 
+The same again for a later change. Held-out once counted the leftover at the
+end of each file as a block of its own; the first session to count whole
+blocks only also read the old blocks, once, and wrote
+
+    # held-out at the start, with each file's leftover part-block, as read before: 0.6012   ...
+
+so everything logged before it moves by that difference too.
+
 Pure Python, no torch, so the plotting tools can import it.
 """
 import re
@@ -31,17 +39,19 @@ PREFIX = "# held-out at the start, "
 SPREAD = "spread over the whole set"
 CHECKS = "the checks' blocks"
 TOP = "from the top as checks read before"
+PARTS = "with each file's leftover part-block, as read before"
 
 _LINE = re.compile(r"^# held-out at the start, ([^:\n]+): ([\d.]+)([^\n]*)$",
                    re.M)
 _PAIR = re.compile(r"([a-z_]+) ([\d.]+)")
 
 
-def banner(spread, checks=None, top=None):
+def banner(spread, checks=None, top=None, parts=None):
     """The banner's lines for one session start, from dicts of subject ->
     loss. A dict left out or empty writes no line."""
     out = []
-    for label, d in ((SPREAD, spread), (CHECKS, checks), (TOP, top)):
+    for label, d in ((SPREAD, spread), (CHECKS, checks), (TOP, top),
+                     (PARTS, parts)):
         if d:
             out.append(PREFIX + f"{label}: {sum(d.values()) / len(d):.4f}"
                        + "".join(f"   {k} {v:.4f}"
@@ -73,6 +83,19 @@ def first_shift(text):
     return None
 
 
+def part_shift(text):
+    """Where held-out first counted whole blocks only, and how far the blocks
+    read before - with each file's leftover part-block among them - sat from
+    that level there, subject by subject: (offset, {subject: parts -
+    spread}). None if the log never says. The session that made the change
+    read both, on the same weights (minagi/stream.py, WHOLE BLOCKS ONLY)."""
+    for at, g in levels(text):
+        if g.get(SPREAD) and g.get(PARTS):
+            return at, {k: g[PARTS][k] - g[SPREAD][k]
+                        for k in g[SPREAD] if k in g[PARTS]}
+    return None
+
+
 def moved(val, dom, delta):
     """An old check (overall loss, {subject: loss} or None) on the spread
     level. The overall moves by the mean difference over the subjects the
@@ -92,3 +115,89 @@ def is_check(head):
     the rate controller's evidence line; the larger evaluation a session ends
     on does not."""
     return "evidence t " in head
+
+
+# A log entry's header: step, characters read (M), corpus size, minutes into
+# the session, experts.
+LOG_HEAD = re.compile(
+    r"^step ([\d,]+)\s+([\d.]+)M (?:of ([\d,]+)M )?characters"
+    r"[^\n]*?(\d+) min(?:\s+(\d+) experts)?", re.M)
+
+
+def parse_log(path):
+    """Every entry in a sample log, oldest first, with held-out on one level.
+
+    Checks moved to blocks spread over the whole held-out set partway through
+    the run. An entry from before that read the top of each subject, and sits
+    away from the level checks report at now by what the first spread session
+    start measured: it is moved by that much, subject by subject, and marked
+    `shifted`. The larger evaluation a session ended on before then was a
+    third measurement, neither the checks' nor the new level, and is left out
+    - only a check writes the controller's evidence line, so once a log has
+    one, an entry before the change without it is one of those. After the
+    change that evaluation is the level itself and stays.
+
+    Here rather than in tools/plot_progress.py so the trainer can read the
+    log without importing a plotting library.
+    """
+    txt = open(path, errors="ignore").read()
+    first = first_shift(txt)
+    whole = part_shift(txt)
+    rows, had_check = [], False
+    heads = list(LOG_HEAD.finditer(txt))
+    for i, m in enumerate(heads):
+        end = heads[i + 1].start() if i + 1 < len(heads) else len(txt)
+        blk = txt[m.end():min(m.end() + 700, end)]
+        r = {"step": int(m.group(1).replace(",", "")),
+             "chars": float(m.group(2)),
+             "corpus": (float(m.group(3).replace(",", ""))
+                        if m.group(3) else None),
+             "min": int(m.group(4)),
+             "experts": int(m.group(5)) if m.group(5) else None}
+        g = re.search(r"context ([\d,]+) characters", blk)
+        r["context"] = int(g.group(1).replace(",", "")) if g else None
+        g = re.search(r"reading ([\d,]+) char/s", blk)
+        r["rate"] = int(g.group(1).replace(",", "")) if g else None
+        g = re.search(r"train loss ([\d.]+)", blk)
+        r["train"] = float(g.group(1)) if g else None
+        g = re.search(r"lr ([\d.e+-]+)", blk)
+        r["lr"] = float(g.group(1)) if g else None
+        g = re.search(r"evidence t ([+-][\d.]+) over (\d+)", blk)
+        r["evidence"] = float(g.group(1)) if g else None
+        r["evidence_n"] = int(g.group(2)) if g else None
+        g = re.search(r"\(effect ([+-][\d.]+)\)", blk)
+        r["effect"] = float(g.group(1)) if g else None
+        g = re.search(r"grad norm ([\d.]+)", blk)
+        r["gnorm"] = float(g.group(1)) if g else None
+        g = re.search(r"held-out loss ([\d.]+) \+/-([\d.]+)", blk)
+        if g:
+            r["val"], r["se"] = float(g.group(1)), float(g.group(2))
+        g = re.search(r"^  ([a-z_]+ [\d.]+(?:   [a-z_]+ [\d.]+)*)\s*$", blk,
+                      re.M)
+        if g:
+            parts = g.group(1).split()
+            r["dom"] = {parts[i]: float(parts[i + 1])
+                        for i in range(0, len(parts) - 1, 2)}
+        if first is None or m.start() < first[0]:
+            check = is_check(blk)
+            if had_check and not check:
+                continue
+            had_check = had_check or check
+            if first is not None and r.get("val") is not None:
+                r["val"], dom = moved(r["val"], r.get("dom"), first[1])
+                if dom is not None:
+                    r["dom"] = dom
+                r["shifted"] = True
+        # and everything before held-out counted whole blocks only moves by
+        # what that change measured, on top of any move above
+        if (whole is not None and m.start() < whole[0]
+                and r.get("val") is not None):
+            r["val"], dom = moved(r["val"], r.get("dom"), whole[1])
+            if dom is not None:
+                r["dom"] = dom
+            r["shifted"] = True
+        rows.append(r)
+    corpus = next((r["corpus"] for r in reversed(rows) if r["corpus"]), None)
+    for r in rows:
+        r["corpus"] = r["corpus"] or corpus
+    return rows
