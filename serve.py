@@ -329,6 +329,16 @@ def stream(prompt, max_new):
         text = tok.decode(produced)
         if text.endswith(B1):
             break
+        # LOOP-BREAKER - local patch, UI replies only. Phrase loops are the
+        # known blind spot of the adaptation trace: a block returning every
+        # 40+ characters has decayed out of its 5.4-character half-life
+        # memory long before it comes back. The wall is worse than the cut:
+        # if the last 32 characters have already occurred three times
+        # within the last 512, the reply is looping - stop here.
+        if len(text) >= 96:
+            tail = text[-32:]
+            if text[-512:].count(tail) >= 3:
+                break
         yield {"t": tok.decode([produced[-1]])}
 
 
