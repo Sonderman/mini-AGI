@@ -184,8 +184,14 @@ def load(weights, device=None, learn=True, lr=None, save_every=8,
         print(f"[learning] on - one step per {ch} characters, "
               f"{left} to the first (about {max(1, round(left / 93))} "
               f"exchanges), at the run's rate: {base:g} x{ln.factor():.4f} "
-              f"= {base * ln.factor():.3g}; saved to {weights}/ every "
-              f"{save_every} steps", file=sys.stderr)
+              f"= {base * ln.factor():.3g}"
+              + (f", moved by its controller at a held-out check every "
+                 f"{ln.gov.every:g} minutes of learning, as in training"
+                 if ln.gov is not None else
+                 ", where it stays: no held-out folder for its controller "
+                 "to read")
+              + f"; saved to {weights}/ every {save_every} steps",
+              file=sys.stderr)
     return model
 
 
@@ -351,6 +357,7 @@ def remember(user_text, bot_text):
     if not text:
         return None
     try:
+        checked = len(learner.checked)
         recs = learner.feed(text, STATE["tok"], note="chat")
         # Reported even when no step was taken. A step needs `chunk`
         # characters and an exchange is about ninety, so the first twenty or
@@ -361,6 +368,15 @@ def remember(user_text, bot_text):
                "pending": learner.pending,
                "chunk": learner.chunk,
                "total": learner.steps}
+        if len(learner.checked) > checked:
+            # training's held-out check came due while it learned: the
+            # controller has read it and set the rate (minagi/governor.py)
+            c = learner.checked[-1]
+            out["check"] = {"held_out": round(c["val"], 4),
+                            "rate": round(c["scale"], 5)}
+            print(f"[learning] held-out check {c['val']:.4f} - the rate is "
+                  f"x{c['scale']:.4f}" + (f"; {c['note']}" if c["note"]
+                                          else ""), file=sys.stderr)
         if recs:
             out["loss"] = round(float(recs[-1].get("loss", 0.0)), 4)
             if learner.due_to_save():

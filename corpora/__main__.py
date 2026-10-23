@@ -5,6 +5,7 @@
     fetch        any Hugging Face dataset, by name
     reasoning    OpenThoughts deliberation traces
     pg19         the PG19 test split, for a comparable bits-per-byte
+    enwik9       the 50 MB enwik9 slice the README's enwik9 table is scored on
 
     code         Python from the local filesystem   -> data_char
     arithmetic   synthesised, with scratchpads      -> data_math_char
@@ -28,6 +29,7 @@ BUILDERS = {"code": "corpora.code",
             "fetch": "corpora.fetch",
             "reasoning": "corpora.reasoning",
             "pg19": "corpora.pg19",
+            "enwik9": "corpora.enwik9",
             "all": "corpora.build"}
 
 

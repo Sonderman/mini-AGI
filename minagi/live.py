@@ -31,14 +31,20 @@ A smaller learning rate is not the fix. Descent has a direction, and on the
 model's own argmax that direction is to confirm it; a lower rate confirms it
 more slowly.
 
-THE RATE IS THE RUN'S. Whatever the stream is - a conversation, or a test
-set read while learning - it continues the stream training reads, so it
-continues training's rate as well: the base rate times the plasticity
-controller's factor (minagi/plasticity.py), both restored from the weights,
-with every newborn expert at its own multiple of that, as in training. The
-controller moves only at a held-out check, and this stream takes none, so the
-factor stays where training left it; the steps it took are saved back. A flat
-3e-4, as this once used, was ~35 times the rate training had come down to.
+THE RATE IS THE RUN'S, AND SO IS ITS CONTROLLER. Whatever the stream is - a
+conversation, or a test set read while learning - it continues the stream
+training reads, so it continues training's rate as well: the base rate times
+the plasticity controller's factor (minagi/plasticity.py), both restored from
+the weights, with every newborn expert at its own multiple of that, as in
+training. And the controller goes on working as it does in training, because
+it is part of the model - it is what sets how fast the model adapts: the
+session starts with training's held-out evaluation, and every few minutes of
+learning a check reads held-out at that level, the controller observes it and
+the newborn experts' rates relax (minagi/governor.py, the one path training
+takes as well). How often, and on which held-out set, is what the run wrote
+into the weights. Without that held-out folder the controller cannot read,
+and the rate stays where training left it. A flat 3e-4, as this once used,
+was ~35 times the rate training had come down to.
 And a save writes back everything the weights directory carried that this
 does not own - the controller's state, the reading shares - where it once
 rebuilt the manifest without them, and the next training session started at
@@ -81,6 +87,10 @@ class LiveLearner:
         self.steps = 0
         self.unsaved = 0
         self.log = []
+        # the held-out check and the controller's response to it - set by
+        # for_run (minagi/governor.py); None leaves the rate where it is
+        self.gov = None
+        self.checked = []
         # the controller, where training left it, and how far the stream had
         # got: a save carries both on by what was learned here
         from .plasticity import Plasticity
@@ -175,10 +185,13 @@ class LiveLearner:
         """The controller's factor on the base rate, as training applies it."""
         return self.plast.factor()
 
-    def step_on(self, ids, note=""):
+    def step_on(self, ids, note="", new=None):
         """One optimiser step on exactly `ids`, outside the stream's window:
-        for text read in pieces, each learned from alone."""
-        return self._step(note, ids=list(ids), new=len(ids) - 1)
+        for text read in pieces, each learned from alone, or a window a
+        reader has laid out itself. `new` is how many of its characters were
+        not read before - all of them unless said."""
+        return self._step(note, ids=list(ids),
+                          new=len(ids) - 1 if new is None else new)
 
     def _step(self, note="", ids=None, new=None):
         """One optimiser step on the window as it stands. `new` is how many
@@ -218,6 +231,7 @@ class LiveLearner:
         self.steps += 1
         self.unsaved += 1
         self.plast.tick()
+        self.check_if_due()
         self.chars += new
         self.nats += float(loss) * new
         if pool is not None and hasattr(pool, "now"):
@@ -226,6 +240,26 @@ class LiveLearner:
                "grad_norm": gn, "lr": self.opt.param_groups[-1]["lr"],
                "scale": scale, "note": note, "at": time.time()}
         self.log.append(rec)
+        return rec
+
+    def check_if_due(self):
+        """Training's held-out check, when it is due: read held-out at the
+        session's level and let the controller and the experts' rates respond
+        (minagi/governor.py). The model is left in the mode it was in."""
+        if self.gov is None or not self.gov.due():
+            return None
+        was_training = self.model.training
+        try:
+            got = self.gov.check()
+        finally:
+            self.model.train(was_training)
+        if got is None:
+            return None
+        d, v, se, note = got
+        rec = {"step": self.steps, "val": v, "se": se,
+               "scale": self.plast.factor(), "note": note,
+               "at": time.time()}
+        self.checked.append(rec)
         return rec
 
     def due_to_save(self):
@@ -244,9 +278,11 @@ class LiveLearner:
             cfg = asdict(mc) if is_dataclass(mc) else (dict(mc.__dict__)
                                                        if mc else None)
         pool = getattr(self.model, "pool", None)
-        if pool is not None and hasattr(pool, "relax_rates"):
+        if (self.gov is None and pool is not None
+                and hasattr(pool, "relax_rates")):
             # newborn rates come down by what each expert was trained, as
-            # training brings them down at its checks
+            # training brings them down at its checks - which do it here too
+            # whenever this learner takes them
             pool.relax_rates()
         # everything the directory carried that the store does not write
         # itself - the controller, the reading shares, the base rate - and
@@ -269,16 +305,69 @@ class LiveLearner:
 
     @classmethod
     def for_run(cls, model, weights_dir=None, manifest=None, lr=None,
-                chunk=None, context=None, save_every=8, config=None):
+                chunk=None, context=None, save_every=8, config=None,
+                checks=True, held_out=None):
         """A learner set up as training is: config.yaml's training settings,
         the base rate the run itself used (the manifest's `lr`, which train.py
         writes) unless `lr` says otherwise, and the controller where the run
-        left it."""
+        left it - working as it does in training: the session's held-out
+        evaluation now, and a check every few minutes of learning, as the run
+        took them (the manifest's `checks`; minagi/governor.py). `held_out`
+        names another folder; `checks=False` leaves the rate where the run
+        left it, for tests."""
         from .config import get, load
         c = config if config is not None else load()
         man = dict(manifest or {})
         base = (float(lr) if lr is not None
                 else float(man.get("lr") or get(c, "training.lr", 3e-4)))
+        me = cls._for_run(model, base, man, c, weights_dir, chunk, context,
+                          save_every)
+        if checks:
+            me.govern(man.get("checks"), held_out,
+                      chunk=int(get(c, "training.chunk", 2048)))
+        return me
+
+    def govern(self, settings=None, held_out=None, chunk=None):
+        """Run the controller as training does: the session's held-out
+        evaluation now, then a check whenever one is due. Held-out is read
+        in training's chunks, `chunk`, whatever this stream steps by - the
+        readings are training's. Returns the evaluation, or None when there
+        is no held-out folder to read - the rate then stays where the run
+        left it, and this says so."""
+        import os
+        from .governor import Governor
+        s = dict(settings or {})
+        if held_out:
+            s["held_out"] = held_out
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        dev = next(self.model.parameters()).device
+        self.gov = Governor.for_learner(self.model, self.plast,
+                                        int(chunk or self.chunk), dev, s,
+                                        root=root)
+        if self.gov is None:
+            print(f"  [note] no held-out folder at "
+                  f"{s.get('held_out') or 'data/val'} - the learning rate's "
+                  f"controller cannot read, so the rate stays where the run "
+                  f"left it", flush=True)
+            return None
+        print(f"  reading held-out as a training session starts, "
+              f"{-(-self.gov.eval_steps // self.gov.ev.per)} blocks of each "
+              f"subject, for the level its checks report at", flush=True)
+        was_training = self.model.training
+        try:
+            v, se, c = self.gov.start()
+        finally:
+            self.model.train(was_training)
+        import numpy as np
+        print(f"  held-out at the start: {np.mean(list(v.values())):.4f} "
+              f"+/-{se:.4f}; a check every {self.gov.every:g} minutes of "
+              f"learning moves the rate as training's do", flush=True)
+        return v
+
+    @classmethod
+    def _for_run(cls, model, base, man, c, weights_dir, chunk, context,
+                 save_every):
+        from .config import get
         return cls(model, lr=base,
                    aux_weight=float(getattr(getattr(model, "cfg", None),
                                             "pool_aux", 0.0) or 0.0),
