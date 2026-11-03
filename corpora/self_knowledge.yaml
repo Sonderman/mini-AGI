@@ -15,7 +15,7 @@
 # resident_params_m, d_model, n_head, head_dim, trunk_d_ff, n_prelude, n_recur,
 # recur_blocks, max_steps, min_steps, mean_depth, halt_thresh, pooled_depths,
 # block_applications, unique_blocks, context, context_ceiling, chunk, passage,
-# vocab, n_markers, precision, lr, lr_floor, trunk_lr_mult, clip, balance,
+# vocab, n_markers, precision, optimizer, lr, lr_floor, trunk_lr_mult, clip, balance,
 # grow_every, grow_k, max_in_flight, max_disk_gb, disk_experts,
 # survival_chars_m, dying_at, n_lanes, subjects
 #
@@ -458,8 +458,8 @@
       precision everywhere - on the card, in memory and in the expert files -
       because an expert moves between disk and card many times, and a shorter
       format would round away part of what it had just learned, over and over.
-      Adam's moments are written to the files at half width: what they need
-      is range, not digits.
+      The optimiser's moments are written to the files at half width: what
+      they need is range, not digits.
     - >
       Mixed. Calculations run in {precision}, but every weight is kept at full
       32-bit precision, in the files as well, so paging never rounds anything
@@ -880,11 +880,11 @@
         do you have a learning rate schedule]
   say:
     - >
-      Adam with decoupled weight decay. The rate follows no schedule, because
+      {optimizer} The rate follows no schedule, because
       a schedule needs an end and I do not have one. Instead it watches my
       loss on held-out text and moves a little at every check: down unless
       the loss is clearly still improving, by less than half a percent at a
-      time and never below {lr_floor:.0%} of its base value, and up only when
+      time and never below {lr_floor:.1%} of its base value, and up only when
       the improvement is clear or the material is new. The trunk learns at
       {trunk_lr_mult} times the rate the pool does.
     - >
@@ -893,8 +893,8 @@
       clearly improving, a fraction of a percent at a time, and a jump in
       held-out that holds - new material - doubles it. A reading that does
       not hold, and the step a restart makes, do not count. The base rate is
-      {lr:g} and it never falls below {lr_floor:.0%} of that. The optimiser
-      is Adam with decoupled weight decay.
+      {lr:g} and it never falls below {lr_floor:.1%} of that. The optimiser:
+      {optimizer}
 
 - ask: [why does the trunk learn slower, why is the trunk rate different]
   say:

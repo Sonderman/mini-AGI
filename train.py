@@ -56,6 +56,7 @@ import torch
 import torch.nn as nn
 
 from minagi.recur import RecurConfig, RecurCoder, load_recur
+from minagi.model import watch_logits
 from minagi.pool import PooledMLP, AutoGrow, split_trunk_pool
 from minagi.stream import StreamSet, Evaluator, detach_caches, ramp_context
 from minagi.plasticity import Plasticity
@@ -96,14 +97,30 @@ def _resync_opt(opt, model, args):
     # a group added mid-run needs the anchor the schedule scales from, or it
     # would sit at whatever rate it was born with while everything else decays
     base = args.lr
-    if mats:
-        opt.add_param_group({"params": mats, "name": "pool",
+    from minagi.muon import adopt
+    for on, ps in (adopt(opt, model, mats) if mats else []):
+        opt.add_param_group({"params": ps, "name": "pool", "muon": on,
                              "weight_decay": args.wd,
                              "lr": base, "base_lr": base})
     if vecs:
         opt.add_param_group({"params": vecs, "name": "pool",
                              "weight_decay": 0.0,
                              "lr": base, "base_lr": base})
+
+
+def _auto_device():
+    """
+    The device to use when --device is not given: CUDA (or ROCm, which torch
+    also calls cuda) where there is one, else Apple Silicon's GPU (MPS), else
+    the CPU. An MPS forward computes in fp32 - minagi/precision.py turns
+    autocast on only for CUDA, ROCm, XPU and a CPU with bf16 arithmetic.
+    """
+    if torch.cuda.is_available():
+        return "cuda"
+    mps = getattr(torch.backends, "mps", None)
+    if mps is not None and mps.is_available():
+        return "mps"
+    return "cpu"
 
 
 def cmd_stream(args):
@@ -228,7 +245,7 @@ def cmd_stream(args):
     # model bug and was not. Appended a line at a time, so an interrupted run
     # keeps everything up to the interruption.
     hist_path = os.path.join(args.out, "history.jsonl")
-    hist = open(hist_path, "a", buffering=1)
+    hist = open(hist_path, "a", buffering=1, encoding="utf-8")
 
     def record(kind, step=None, **kw):
         hist.write(json.dumps({"kind": kind, "step": step, **kw}) + "\n")
@@ -879,13 +896,14 @@ def cmd_read(args):
               f"- faster, and it needs the memory depth was using")
     trunk, pool_ps = _split_trunk_pool(model)
 
-    tg = {"params": trunk, "name": "trunk", "weight_decay": args.wd,
-          "lr": args.lr * args.trunk_lr_mult,
-          "base_lr": args.lr * args.trunk_lr_mult}
-    pg = {"params": pool_ps, "name": "pool", "weight_decay": args.wd,
-          "lr": args.lr, "base_lr": args.lr}
-    opt = torch.optim.AdamW([tg, pg], lr=args.lr, betas=(0.9, 0.95),
-                            fused=(device.type == "cuda"))
+    # AdamW, or Muon for the weight matrices (training.optimizer) - the one
+    # factory every learner builds its optimiser with (minagi/muon.py)
+    from minagi import muon
+    opt = muon.build(model, trunk, pool_ps, args.lr,
+                     args.lr * args.trunk_lr_mult, args.wd,
+                     kind=args.optimizer, fused=(device.type == "cuda"),
+                     which=args.muon_params)
+    print(f"  {muon.describe(opt)}")
     snr = GradSNR()
     print(f"  trunk learns at {args.trunk_lr_mult:g}x the pool's rate "
           f"({sum(q.numel() for q in trunk)/1e6:.1f}M trunk, "
@@ -905,7 +923,7 @@ def cmd_read(args):
     # THE CHECK AND WHAT IT DOES TO THE RATE go through minagi/governor.py,
     # the one path chat and the benchmarks' learning take as well. Its
     # controller is put in below, once restored.
-    gov = (Governor(None, pool, ev, args.chunk, every=args.sample_every,
+    gov = (Governor(None, ev, args.chunk, every=args.sample_every,
                     check_chars=args.sample_eval_chunks,
                     eval_chars=args.eval_chunks)
            if ev is not None else None)
@@ -964,14 +982,6 @@ def cmd_read(args):
         best_val = min(best_val, before)
 
     pool.attach_optimiser(opt)
-    # A newborn expert learns at the full rate, its own coming down to the
-    # main one as it is trained - see `rate` in minagi/paged.py.
-    pool.newborn_rate = bool(args.newborn_lr)
-    pool.rate_half = float(args.newborn_half)
-    if args.newborn_lr:
-        print(f"  newborn experts start at the full rate and come down to the "
-              f"main one as they are trained: half the way, in log terms, "
-              f"every {args.newborn_half:,.0f} of their own steps", flush=True)
     # ADAM'S MOMENTS. They are written to optim.npz at every checkpoint and
     # were never read back here: this path builds a fresh optimiser and only
     # ever SAVED it. So every restart threw away 108.9M moment values, 99.9% of
@@ -1046,7 +1056,8 @@ def cmd_read(args):
         # Append. A resumed run continues the same model, so wiping the file
         # would throw away the only record of how it got here; the banner is
         # what separates one session from the next.
-        with open(args.sample_log, "a") as f:
+        with open(args.sample_log, "a", encoding="utf-8",
+                  errors="replace") as f:
             f.write(f"\n\n{'#' * 78}\n")
             f.write(f"# session started {time.strftime('%Y-%m-%d %H:%M')}  "
                     f"at step {step:,}, {base_chars/1e6:.1f}M of "
@@ -1167,24 +1178,6 @@ def cmd_read(args):
     if base_chars:
         print(f"  {base_chars/1e6:.1f}M characters read in earlier sessions")
 
-    rates_path = os.path.join(os.path.dirname(args.sample_log) or ".",
-                              "expert_rates.jsonl")
-
-    def log_rates(chars, main):
-        # Each expert's learning rate at this check, as a factor of `lr`, for
-        # the dashboard: a thin line per expert and their average as the main
-        # one. Only under the newborn rule; otherwise every expert is at main.
-        try:
-            n = pool.n_experts()
-            r = (pool.rate[:n].clamp(max=1.0 / max(main, 1e-9)) * main).tolist()
-            row = {"chars": chars, "main": round(main, 6), "lr": args.lr,
-                   "uid": [int(u) for u in pool.uid[:pool.n_experts()]],
-                   "rate": [round(v, 6) for v in r]}
-            with open(rates_path, "a") as f:
-                f.write(json.dumps(row, separators=(",", ":")) + "\n")
-        except Exception as e:                  # never stops a run
-            print(f"    (rates not written: {e})", flush=True)
-
     def log_history(val=None):
         """
         Append what the pool looks like now, so a run leaves a trail.
@@ -1206,7 +1199,7 @@ def cmd_read(args):
                    "last_seen": t.get("last_seen"), "uid": t.get("uid"),
                    "trial": getattr(model.pool, "trial", 0)}
             os.makedirs(os.path.dirname(args.history) or ".", exist_ok=True)
-            with open(args.history, "a") as f:
+            with open(args.history, "a", encoding="utf-8") as f:
                 f.write(json.dumps(row, separators=(",", ":")) + "\n")
         except Exception as e:                  # telemetry must never stop a run
             print(f"    (history not written: {e})", flush=True)
@@ -1236,6 +1229,8 @@ def cmd_read(args):
     stop = False
     swapped = 0
     recent = collections.deque(maxlen=400)     # the training loss lately
+    loss_log = (open(args.loss_log, "a", buffering=1, encoding="utf-8")
+                if getattr(args, "loss_log", None) else None)
     last_gap = None                            # held-out minus train, when known
     # How much information has been read, as against how many characters were
     # passed over: the loss IS the information content of what was read, so
@@ -1349,7 +1344,6 @@ def cmd_read(args):
                 # horizon to be wrong about and no count of characters
                 # anywhere in it.
                 scale = plast.factor()
-                pool.main_scale = scale
                 for gg in opt.param_groups:
                     gg["lr"] = gg.get("base_lr", gg["lr"]) * scale
                 opt.zero_grad(set_to_none=True)
@@ -1393,6 +1387,20 @@ def cmd_read(args):
                 # gradient at the chunk boundary.
                 fl.append(float(loss))
                 recent.append(float(loss))
+                if loss_log is not None:
+                    # every step's loss and where it was read, so two runs
+                    # that read the same text compare chunk by chunk: the
+                    # loss trained on, and the model's own part of it - the
+                    # number held-out reads, without the router's terms
+                    ml = getattr(r, "model_loss", None)
+                    loss_log.write(json.dumps(
+                        {"step": step, "lane": lane.name, "file": path,
+                         "pos": getattr(r, "pos", None), "j": j,
+                         "loss": round(float(loss), 6),
+                         "model": (round(float(ml), 6) if ml is not None
+                                   else None),
+                         "t": round(time.time(), 2)},
+                        separators=(",", ":")) + "\n")
                 by_pos[j].append(float(loss))
                 seen += args.chunk
                 nats += float(loss) * args.chunk
@@ -1410,10 +1418,13 @@ def cmd_read(args):
                                                       1e-6)
                     v_ = se_ = None
                     dom = None
+                    logits = {}
                     if gov is not None:
                         # the checks' blocks, at the level the start measured
-                        # - see `level`
-                        d, v_, se_ = gov.reading()
+                        # - see `level` - and the largest attention logit
+                        # reading them computes, the same blocks every check
+                        with watch_logits(model) as logits:
+                            d, v_, se_ = gov.reading()
                         sched.observe(base_chars + seen, d)
                         moved_share = sched.step()
                         if moved_share:
@@ -1425,13 +1436,22 @@ def cmd_read(args):
                         if recent:
                             last_gap = v_ - float(np.mean(recent))
                         dom = dict(d)
-                        # the controller observes it and every expert's own
-                        # rate relaxes - as in chat and the benchmarks
+                        # the controller observes it - as in chat and the
+                        # benchmarks
                         moved_lr = gov.govern(v_, se_)
-                        if args.newborn_lr:
-                            log_rates(base_chars + seen, plast.factor())
                         if moved_lr:
                             print(f"    {moved_lr}", flush=True)
+                        # REMOVING THIS: delete these five lines and
+                        # minagi/notify.py. Nothing else refers to either, and
+                        # the import is guarded so the run does not notice.
+                        if v_ < best_val:
+                            prev_best, best_val = best_val, v_
+                            try:
+                                from minagi import notify
+                                notify.best(v_, base_chars + seen,
+                                            pool.n_experts(), prev_best)
+                            except Exception:
+                                pass
                     # WRITING SPEED: the characters the samples wrote over the
                     # time spent writing them. Every reading writes exactly
                     # sample_chars.
@@ -1454,12 +1474,15 @@ def cmd_read(args):
                                   write_rate=write_rate,
                                   level=(float(np.mean(list(level.values())))
                                          if level and v_ is not None
-                                         else None))
+                                         else None),
+                                  logits=logits)
                     rp = pool.report()
                     print(f"    samples -> {args.sample_log}"
                           + (f"  train {float(np.mean(recent)):.4f}"
                              if recent else "")
                           + (f"  held-out {v_:.4f}" if v_ is not None else "")
+                          + (f"  logit {max(logits.values()):.1f}"
+                             if logits else "")
                           + (f"  signal {snr.ratio():.3f}"
                              if snr.ratio() is not None else "")
                           + f"  | {swapped/max(did,1):.1f} experts loaded "
@@ -1895,7 +1918,7 @@ def _dropped_note(model):
 # `out` is where the graphs go and `tools` where their plotters are - runs/
 # and this repository's tools/ unless a test says otherwise, so a test never
 # draws over a run's graphs or touches the plotters a running run uses
-_PLOTS = {"proc": None, "on": True, "since": None, "log": None,
+_PLOTS = {"procs": [], "on": True, "since": None, "log": None,
           "weights": None, "out": None, "tools": None}
 
 
@@ -1903,8 +1926,7 @@ def refresh_plots():
     """Redraw the graphs from the log just written. Never raises, never waits."""
     if not _PLOTS["on"]:
         return
-    p = _PLOTS["proc"]
-    if p is not None and p.poll() is None:
+    if any(p.poll() is None for p in _PLOTS["procs"]):
         return                          # the last one has not finished
     import subprocess
     here = os.path.dirname(os.path.abspath(__file__))
@@ -1938,21 +1960,27 @@ def refresh_plots():
         if _PLOTS["since"] is not None:
             c += ["--last", str(_PLOTS["since"])]
         cmds.append(c)
+    # Each plotter is started as itself, with an argument list: no shell, so
+    # nothing to quote and no `bash` to find (on Windows that name can be WSL's,
+    # which cannot run a D:/ path). They write different files, so they draw
+    # side by side; every child is kept, so the next refresh waits for all of
+    # them, including any started before a later one failed to start.
+    _PLOTS["procs"] = []
     try:
-        script = " && ".join(" ".join(f'"{x}"' for x in c) for c in cmds)
-        _PLOTS["proc"] = subprocess.Popen(
-            ["bash", "-c", script], cwd=here,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for c in cmds:
+            _PLOTS["procs"].append(subprocess.Popen(
+                c, cwd=here,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     except OSError:
-        _PLOTS["on"] = False            # no python, no bash - stop trying
+        _PLOTS["on"] = False            # no python to run them - stop trying
 
 
 def write_samples(path, step, chars, minutes, samples, val=None, se=None,
                   per_domain=None, experts=None, train=None, lr=None,
                   corpus=None, context=None, ceiling=None, gain=None,
                   rate=None, gnorm=None, clip=None, plast=None,
-                  write_rate=None, level=None):
-    with open(path, "a") as f:
+                  write_rate=None, level=None, logits=None):
+    with open(path, "a", encoding="utf-8", errors="replace") as f:
         f.write(f"\n{'=' * 78}\n")
         # How much has been read, against how much there is. A bare count of
         # characters read says nothing on its own - the same 4M is most of a
@@ -2016,8 +2044,17 @@ def write_samples(path, step, chars, minutes, samples, val=None, se=None,
                 f.write(f"   evidence t {plast.get('t', 0):+.2f}"
                         f" over {plast.get('n', 0)}"
                         f" (effect {plast.get('e', 0):+.4f})"
-                        f"   rate x{plast.get('scale', 1):.3f}")
+                        f"   rate x{Plasticity.shown(plast.get('scale', 1))}")
             f.write("\n")
+        if logits:
+            # The largest score softmax was taken of while the check read its
+            # blocks, and each attention's own. Under Muon it can grow until
+            # a softmax saturates on one key (minagi/model.py, watch_logits).
+            # Written before held-out, where tools/export_history.py closes
+            # a record.
+            f.write(f"attention logit {max(logits.values()):.2f} at most   "
+                    + "   ".join(f"{n.replace('.attn', '')} {v:.2f}"
+                                 for n, v in logits.items()) + "\n")
         if val is not None:
             f.write(f"held-out loss {val:.4f}")
             if se:
@@ -2159,6 +2196,16 @@ def build_paged(wdir, device, resident=None, ram_capacity=256, ceiling=None,
         pool.balance = float(_get_cfg(_c, "pool.balance", 0.0) or 0.0)
         pool.select_temperature = float(
             _get_cfg(_c, "pool.select_temperature", 0.0) or 0.0)
+        # how the chosen experts are weighted, the routing bias, and a
+        # newborn's gate - see PooledMLP._route and PagedPool.bias
+        ga = _get_cfg(_c, "pool.gate_after", False)
+        pool.gate_after = ("scaled" if str(ga).strip().lower() == "scaled"
+                           else bool(ga))
+        pool.route_bias = float(_get_cfg(_c, "pool.route_bias", 0.0) or 0.0)
+        pool.route_bias_offset = float(
+            _get_cfg(_c, "pool.route_bias_offset", 25.0) or 25.0)
+        pool.birth_gate_parents = float(
+            _get_cfg(_c, "growth.birth_gate_parents", 0.0) or 0.0)
     except Exception:
         pass
     ever = cfgd.get("pool_ever")
@@ -2232,7 +2279,7 @@ def main():
     ap = argparse.ArgumentParser(
         description="train mini-AGI: read files continually, or stream a "
                     "packed corpus. Batch 1, cached, chunked, either way")
-    ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    ap.add_argument("--device", default=_auto_device())
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     rd = sub.add_parser("read",
@@ -2400,20 +2447,21 @@ def main():
                          "0 disables. Neither usage brake can see a newborn, "
                          "so without this there is a whole trial in which "
                          "nothing on that side can refuse")
-    rd.add_argument("--newborn-lr", dest="newborn_lr", action="store_true",
-                    default=bool(_cfg(_c, "training.newborn_lr", False)),
-                    help="a newborn expert learns at the full lr and its own "
-                         "rate comes down to the main one as it is trained")
-    rd.add_argument("--no-newborn-lr", dest="newborn_lr",
-                    action="store_false")
-    rd.add_argument("--newborn-half", type=float,
-                    default=_cfg(_c, "training.newborn_half", 15000),
-                    help="steps of an expert's own training that halve how "
-                         "far above the main rate it is, in log terms")
     rd.add_argument("--drop-quietest", type=int, default=0, metavar="N",
                     help="before reading, delete the N experts with the "
                          "smallest gates - a one-off, asked for at launch: "
                          "type N back to go ahead")
+    rd.add_argument("--optimizer", choices=("adamw", "muon"),
+                    default=str(_cfg(_c, "training.optimizer", "adamw")),
+                    help="adamw, or muon for the weight matrices and adamw "
+                         "for the rest (minagi/muon.py)")
+    rd.add_argument("--muon-params", choices=("all", "trunk", "pool"),
+                    default=str(_cfg(_c, "training.muon_params", "all")),
+                    help="which weight matrices muon steps")
+    rd.add_argument("--loss-log", default=None,
+                    help="write every step's loss, subject and file to this "
+                         "file, one JSON line each - for comparing runs that "
+                         "read the same text (tools/ab_pool.py)")
     rd.add_argument("--max-chars", type=float, default=0,
                     help="stop after reading this many characters "
                          "(0: the whole corpus, --passes times)")

@@ -36,8 +36,8 @@ weights. On the card it needs the card to itself, so it will not run beside a
 training run.
 
 NOTHING IS MEASURED TWICE: weights already measured this way, on at least
-as many pieces, are not measured again (--force does), so publish.sh can run
-it every time.
+as many pieces, are not measured again (--force does), so
+./measure_benchmarks.sh can run it every time.
 
 --natural READS AS THE MODEL READS. The pieces above are cut out of their
 pages and each read cold. --natural reads whole pages instead - framed as
@@ -426,8 +426,8 @@ def measure(a, scratch, size):
           f"pieces of {a.piece:,} bytes, in {t_frozen:.0f} s", flush=True)
 
     # Learning as training would at its next step: the run's base rate and
-    # its controller's factor, Adam's moments as the run left them, newborn
-    # experts at their own rates. Nothing is ever saved: the copy is scrapped.
+    # its controller's factor, the optimiser's moments as the run left them.
+    # Nothing is ever saved: the copy is scrapped.
     learner = LiveLearner.for_run(model, weights_dir=scratch, manifest=man,
                                   lr=a.lr, chunk=a.piece, save_every=0,
                                   config=c, held_out=a.held_out)

@@ -35,13 +35,12 @@ THE RATE IS THE RUN'S, AND SO IS ITS CONTROLLER. Whatever the stream is - a
 conversation, or a test set read while learning - it continues the stream
 training reads, so it continues training's rate as well: the base rate times
 the plasticity controller's factor (minagi/plasticity.py), both restored from
-the weights, with every newborn expert at its own multiple of that, as in
-training. And the controller goes on working as it does in training, because
-it is part of the model - it is what sets how fast the model adapts: the
-session starts with training's held-out evaluation, and every few minutes of
-learning a check reads held-out at that level, the controller observes it and
-the newborn experts' rates relax (minagi/governor.py, the one path training
-takes as well). How often, and on which held-out set, is what the run wrote
+the weights, as in training. And the controller goes on working as it does in
+training, because it is part of the model - it is what sets how fast the
+model adapts: the session starts with training's held-out evaluation, and
+every few minutes of learning a check reads held-out at that level and the
+controller observes it (minagi/governor.py, the one path training takes as
+well). How often, and on which held-out set, is what the run wrote
 into the weights. Without that held-out folder the controller cannot read,
 and the rate stays where training left it. A flat 3e-4, as this once used,
 was ~35 times the rate training had come down to.
@@ -71,8 +70,8 @@ class LiveLearner:
 
     def __init__(self, model, lr=3e-4, trunk_lr_mult=0.2, wd=0.1, clip=1.0,
                  aux_weight=0.0, save_every=8, weights_dir=None, manifest=None,
-                 chunk=512, context=None, newborn_lr=False,
-                 newborn_half=15000.0):
+                 chunk=512, context=None, optimizer="adamw",
+                 muon_params="all"):
         self.model = model
         # What the model was loaded as. save() writes the manifest that names
         # every tensor's shape, and without this it writes an empty one: the
@@ -108,8 +107,8 @@ class LiveLearner:
         dev = next(model.parameters()).device
         if getattr(model, "pool", None) is not None:
             # training's own split: the router rows and the depth embedding
-            # are the pool's, at its rate and each newborn's own - split by
-            # name they went to the trunk and learned at its tenth
+            # are the pool's, at its rate - split by name they went to the
+            # trunk and learned at its tenth
             from .pool import split_trunk_pool
             trunk, pool_ps = split_trunk_pool(model)
         else:
@@ -117,20 +116,14 @@ class LiveLearner:
                      if not n.startswith("pool.")]
             pool_ps = [p for n, p in model.named_parameters()
                        if n.startswith("pool.")]
-        self.opt = torch.optim.AdamW(
-            [{"params": trunk, "name": "trunk", "weight_decay": wd,
-              "lr": lr * trunk_lr_mult, "base_lr": lr * trunk_lr_mult},
-             {"params": pool_ps, "name": "pool", "weight_decay": wd,
-              "lr": lr, "base_lr": lr}],
-            lr=lr, betas=(0.9, 0.95), fused=(dev.type == "cuda"))
+        # the optimiser training steps with (training.optimizer)
+        from .muon import build
+        self.opt = build(model, trunk, pool_ps, lr, lr * trunk_lr_mult, wd,
+                         kind=optimizer, fused=(dev.type == "cuda"),
+                         which=muon_params)
         pool = getattr(model, "pool", None)
         if pool is not None and hasattr(pool, "attach_optimiser"):
             pool.attach_optimiser(self.opt)
-        if pool is not None and hasattr(pool, "newborn_rate"):
-            # newborn experts at their own multiple of the main rate, as
-            # training runs them (training.newborn_lr)
-            pool.newborn_rate = bool(newborn_lr)
-            pool.rate_half = float(newborn_half)
         # ADAM'S MOMENTS carry on from where the weights directory left them,
         # as they do when the trainer resumes. A fresh optimiser would start
         # every tensor from zero moments at the first step - the trunk's and
@@ -203,11 +196,8 @@ class LiveLearner:
         dev = next(self.model.parameters()).device
         was_training = self.model.training
         # the rate training would step at now: base times the controller's
-        # factor, and every newborn expert its own multiple of that
+        # factor
         scale = self.plast.factor()
-        pool = getattr(self.model, "pool", None)
-        if pool is not None and hasattr(pool, "main_scale"):
-            pool.main_scale = scale
         for g in self.opt.param_groups:
             g["lr"] = g.get("base_lr", g["lr"]) * scale
         self.model.train()
@@ -234,6 +224,7 @@ class LiveLearner:
         self.check_if_due()
         self.chars += new
         self.nats += float(loss) * new
+        pool = getattr(self.model, "pool", None)
         if pool is not None and hasattr(pool, "now"):
             pool.now = self.step0 + self.steps   # the clock training keeps
         rec = {"step": self.steps, "chars": len(ids), "loss": float(loss),
@@ -277,13 +268,6 @@ class LiveLearner:
             mc = getattr(self.model, "cfg", None)
             cfg = asdict(mc) if is_dataclass(mc) else (dict(mc.__dict__)
                                                        if mc else None)
-        pool = getattr(self.model, "pool", None)
-        if (self.gov is None and pool is not None
-                and hasattr(pool, "relax_rates")):
-            # newborn rates come down by what each expert was trained, as
-            # training brings them down at its checks - which do it here too
-            # whenever this learner takes them
-            pool.relax_rates()
         # everything the directory carried that the store does not write
         # itself - the controller, the reading shares, the base rate - and
         # the stream carried on by what was read here
@@ -377,8 +361,8 @@ class LiveLearner:
                    chunk=chunk or get(c, "training.chunk", 2048),
                    context=context, save_every=save_every,
                    weights_dir=weights_dir, manifest=man,
-                   newborn_lr=bool(get(c, "training.newborn_lr", False)),
-                   newborn_half=float(get(c, "training.newborn_half", 15000)))
+                   optimizer=str(get(c, "training.optimizer", "adamw")),
+                   muon_params=str(get(c, "training.muon_params", "all")))
 
 
 def exchange_text(user_text, bot_text, u0="<user>", u1="</user>",

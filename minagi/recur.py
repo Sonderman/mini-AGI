@@ -418,8 +418,8 @@ def load_recur(path, device, read_only=False):
     Load a model from the weights directory, or from a .pt checkpoint.
 
     The directory is the model, so `weights` is the normal thing to pass. A
-    .pt path still works because the film's captures and older invocations use
-    one, and there is no reason to break them.
+    .pt path still works because older checkpoints and invocations use one,
+    and there is no reason to break them.
     """
     import os
     if os.path.isdir(path) and os.path.exists(os.path.join(path, "manifest.json")):
@@ -505,8 +505,8 @@ def _load_dir(path, device, paged=None, read_only=False):
     if paged is None:
         paged = bool(man.get("paged"))
     if paged:
-        # build_paged lives in train.py; a caller in another directory (the
-        # film's captures run from video/) needs the repo root on the path
+        # build_paged lives in train.py; a caller run from another directory
+        # needs the repo root on the path
         _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         if _root not in sys.path:
             sys.path.insert(0, _root)

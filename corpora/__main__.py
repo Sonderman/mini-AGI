@@ -6,6 +6,7 @@
     reasoning    OpenThoughts deliberation traces
     pg19         the PG19 test split, for a comparable bits-per-byte
     enwik9       the 50 MB enwik9 slice the README's enwik9 table is scored on
+    agent        the next stage's tool-use lanes (--check shows the plan)
 
     code         Python from the local filesystem   -> data_char
     arithmetic   synthesised, with scratchpads      -> data_math_char
@@ -30,6 +31,7 @@ BUILDERS = {"code": "corpora.code",
             "reasoning": "corpora.reasoning",
             "pg19": "corpora.pg19",
             "enwik9": "corpora.enwik9",
+            "agent": "corpora.agent",
             "all": "corpora.build"}
 
 

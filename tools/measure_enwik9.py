@@ -14,9 +14,9 @@ evenly over the slice, the same pieces every time.
 Writes runs/enwik9_measured.json, which tools/refresh_readme.py builds the
 README's enwik9 table from, and adds every measurement to
 runs/scaling/enwik9_history.jsonl, which tools/plot_scaling.py draws. Like
-tools/measure_heldout.py it needs the card and the weights to itself,
-measures nothing twice - a measurement of the same weights is reused - and
-publish.sh stops if it fails.
+tools/measure_heldout.py it needs the card and the weights to itself, and
+measures nothing twice - a measurement of the same weights is reused.
+./measure_benchmarks.sh runs it with the other long measurements.
 
     python3 tools/measure_enwik9.py
     python3 tools/measure_enwik9.py --weights weights_backup   # an older point

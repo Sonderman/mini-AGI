@@ -114,6 +114,29 @@ pool:
   # the first row has only 8 experts where 0 gives it all 32.
   select_temperature: 0
 
+  # HOW EACH CHARACTER'S CHOSEN EXPERTS ARE WEIGHTED.
+  #   false   before the gates, the rule as it has run: the chosen experts'
+  #           router probabilities are made to add up to one, and each share
+  #           is then scaled by that expert's gate - so choosing an expert
+  #           gated near zero takes weight from the strong experts beside it
+  #   true    after them: each share is probability times gate, over the
+  #           chosen experts' total, so the shares add up to one in size and
+  #           a weak expert takes only what its gate gives it
+  #   scaled  after them, then scaled by the chosen experts' gates averaged
+  #           by those shares: experts gated alike mix exactly as before the
+  #           gates, and only a weak one among them changes anything
+  gate_after: false
+
+  # THE ROUTING BIAS - an offset per expert, added to the router's scores
+  # where experts are chosen (the card's vote and every character's top 8)
+  # and nowhere else: not to the weights the chosen are mixed with, and not
+  # to the loss. After every step each offset moves by route_bias, up or
+  # down, toward its rank's share of training choices on the curve
+  # 1 / (rank + route_bias_offset). Saved with the weights, so reading and
+  # chat choose as training does. 0 turns it off.
+  route_bias: 0
+  route_bias_offset: 25
+
 training:
   save_every: 5           # minutes between checkpoints
 
@@ -124,19 +147,27 @@ training:
   # and nudges the rate at every check: down unless held-out is clearly
   # improving, 0.4% at most at a time - on a plateau a tenth or less in six
   # hours - and up only on clear improvement or new material. The floor
-  # (x0.01 of lr) is in plasticity.py.
+  # (x0.001 of lr) is in plasticity.py.
   chunk: 2048             # characters between steps within the window
   lr: 3.0e-4
   trunk_lr_mult: 0.1      # the trunk is shared by every domain and is where
                           # forgetting happens; it learns slower on purpose
-  newborn_lr: true        # a newborn expert learns at the full lr - weights,
-                          # gate and router row - and its own rate comes down
-                          # to the main one as it is trained
-  newborn_half: 15000     # steps of an expert's own training that halve how
-                          # far above the main rate it is, in log terms: a
-                          # week at a 4% share, so it converges over weeks
   weight_decay: 0.1
   clip: 1.0
+
+  # THE OPTIMISER. muon: Muon (Jordan et al. 2024) for every weight matrix -
+  # the trunk's, each expert's, the router's - and AdamW for everything else,
+  # as Liu et al. 2025 ("Muon is Scalable for LLM Training") apply it, its
+  # step scaled to AdamW's typical size so that lr, the controller and
+  # weight_decay mean the same under both (minagi/muon.py). adamw steps every
+  # parameter with AdamW, as the run did for its first 3.19B characters.
+  # From the same weights and the same 30M characters, Muon ended 0.0039 nats
+  # lower on held-out, better in all eight subjects and still pulling away,
+  # at 8% fewer characters a second (tools/ab_pool.py). Muon's one moment is
+  # kept where AdamW keeps its first, so a run moves between them without
+  # losing its momentum.
+  optimizer: muon
+  muon_params: all        # all, trunk or pool: which weight matrices muon steps
 
 growth:
   # Every `every_chars`, add `k` experts if all five brakes are off:
@@ -169,6 +200,9 @@ growth:
 
   birth_gate: 0.001       # gate a new expert starts at - a scale, not a
                           # verdict. Small so it cannot shout before it earns
+  birth_gate_parents: 0   # above 0, a new expert's gate starts at this share
+                          # of its parents' gates, weighted by the units each
+                          # gave it, instead of at birth_gate
 
 prune:
   # USE IT OR LOSE IT. An expert is deleted when nothing has admitted it for

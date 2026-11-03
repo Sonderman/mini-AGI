@@ -14,9 +14,7 @@ controller the same way, through this:
                        (minagi/heldout.py)
   a check              the checks' blocks, read at that level, every `every`
                        minutes of learning: the controller observes the mean
-                       (Plasticity.observe), and every expert's own rate
-                       relaxes toward the main one by how much it was trained
-                       since the last check (relax_rates)
+                       (Plasticity.observe)
 
 Training takes its check in its sample round (train.py, cmd_read), a learner
 outside training when it is due (minagi/live.py), and both go through
@@ -49,13 +47,13 @@ def steps_of(chars, chunk):
 
 class Governor:
     """The held-out check and what it does to the rate, for one session of a
-    model that learns. `plast` is its controller, `pool` its expert pool (or
-    None), `ev` a FolderEvaluator on the held-out folder."""
+    model that learns. `plast` is its controller, `ev` a FolderEvaluator on
+    the held-out folder."""
 
-    def __init__(self, plast, pool, ev, chunk, every=DEFAULTS["every"],
+    def __init__(self, plast, ev, chunk, every=DEFAULTS["every"],
                  check_chars=DEFAULTS["check_chars"],
                  eval_chars=DEFAULTS["eval_chars"]):
-        self.plast, self.pool, self.ev = plast, pool, ev
+        self.plast, self.ev = plast, ev
         self.every = float(every or 0)
         self.check_steps = steps_of(check_chars, chunk)
         self.eval_steps = steps_of(eval_chars, chunk)
@@ -82,7 +80,7 @@ class Governor:
         # chunk longer than that could not be read at all
         chunk = min(int(chunk), int(model.cfg.block))
         ev = FolderEvaluator(model, path, chunk, model.cfg.block, device)
-        return cls(plast, getattr(model, "pool", None), ev, chunk,
+        return cls(plast, ev, chunk,
                    every=s["every"], check_chars=s["check_chars"],
                    eval_chars=s["eval_chars"])
 
@@ -114,31 +112,24 @@ class Governor:
         return d, float(np.mean(list(d.values()))), se
 
     def govern(self, v, se):
-        """What a reading does to the rate: the controller observes it, and
-        every expert's own rate relaxes toward the main one. Returns the
-        controller's note, if the rate moved notably."""
+        """What a reading does to the rate: the controller observes it.
+        Returns the controller's note, if the rate moved notably."""
         moved = self.plast.observe(v, se)
-        self._relax()
         self.checks += 1
         return moved
-
-    def _relax(self):
-        if self.pool is not None and hasattr(self.pool, "relax_rates"):
-            self.pool.relax_rates()
 
     def check(self):
         """A check outside training: read, govern, and start the clock again.
 
         One the controller would not count - fewer optimiser steps since the
         last reading it took than MIN_STEPS, Plasticity.observe's own rule -
-        changes nothing in it, so the blocks are not read: the experts' rates
-        relax as training's round relaxes them, and the clock starts again.
+        changes nothing in it, so the blocks are not read and the clock
+        starts again.
         A quiet conversation spends nothing on checks. Returns (readings,
         mean, standard error, note), or None when skipped."""
         p = self.plast
         if (p.step > 0 and p.seen_at is not None
                 and p.step - p.seen_at < p.MIN_STEPS):
-            self._relax()
             self.last = time.time()
             return None
         d, v, se = self.reading()

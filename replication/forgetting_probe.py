@@ -51,6 +51,21 @@ import train as T                                          # noqa: E402
 
 
 READ_ROOTS = ["data/train"]                 # set from --read-root in main()
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def where(path):
+    """
+    The weights directory as a result records it: relative to the repository
+    when it is inside it, else by its name alone. A result is published with
+    the repository, and an absolute path says where files live on one machine;
+    the step and the pool's size beside it say which weights they were.
+    """
+    full = os.path.realpath(path)
+    root = os.path.realpath(ROOT)
+    if full.startswith(root + os.sep):
+        return os.path.relpath(full, root)
+    return os.path.basename(full.rstrip(os.sep)) or "."
 
 
 def build_stream(domain, need, root=None):
@@ -360,7 +375,7 @@ def main():
     out = {"tag": a.tag or a.domain, "domain": a.domain,
            "recovery": rec_rows, "recover_lanes": a.recover,
            "lanes": lanes, "visit": a.visit, "rotating": len(lanes) > 1,
-           "weights": a.weights, "step": man.get("step"),
+           "weights": where(a.weights), "step": man.get("step"),
            "experts_total": n_exp, "eval_chunks": a.eval_chunks,
            "chunk": a.chunk, "context": ctx, "lr": a.lr,
            "trunk_lr_mult": a.trunk_lr_mult, "optim": "adamw",

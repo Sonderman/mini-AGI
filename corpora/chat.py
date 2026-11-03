@@ -78,14 +78,8 @@ ASK_MATH = [
 # ---------------------------------------------------------------------------
 
 def _self_facts():
-    import sys, os
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                    "video"))
-    try:
-        from facts import FACTS
-    except Exception:
-        FACTS = {}
-    f = dict(FACTS)
+    import os
+    f = {}
     f.setdefault("block", 4096)
     f.setdefault("vocab", 265)
     f.setdefault("n_experts", 74)
@@ -198,17 +192,25 @@ def _self_facts():
     f["expert_file_mb"] = f["expert_params"] * (4 + 2 + 2) / 1e6
     f["max_disk_gb"] = float(_g(c, "growth.max_disk_gb", 10.0) or 0.0)
     f["disk_experts"] = int(f["max_disk_gb"] * 1e3 / f["expert_file_mb"])
-    # DISTINCT blocks, counted from the shape rather than taken from
-    # video/facts.py, whose 6 described a model with three recurrent blocks
-    # and a coda
+    # DISTINCT blocks, counted from the shape
     f["unique_blocks"] = f["n_prelude"] + f["n_recur"] + f["n_coda"]
     f["recur_blocks"] = ("one block" if f["n_recur"] == 1
                          else f"{f['n_recur']} blocks")
+    # the optimiser as config.yaml sets it (minagi/muon.py), as a sentence
+    muon = str(_g(c, "training.optimizer", "adamw")).lower() == "muon"
+    which = str(_g(c, "training.muon_params", "all")).lower()
+    f["optimizer"] = (
+        ("Muon for every weight matrix - the trunk's, each expert's and the "
+         "router's - and Adam with decoupled weight decay for the rest."
+         if which == "all" else
+         f"Muon for the {'trunk' if which == 'trunk' else 'pool'}'s weight "
+         "matrices and Adam with decoupled weight decay for the rest.")
+        if muon else "Adam with decoupled weight decay.")
     try:
         from minagi.plasticity import Plasticity
         f["lr_floor"] = Plasticity.FLOOR
     except Exception:
-        f["lr_floor"] = 0.05
+        f["lr_floor"] = 0.001
     # the lanes reading rotates between, named from the training folder
     train = str(_g(c, "data.train", "data/train"))
     try:

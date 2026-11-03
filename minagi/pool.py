@@ -413,6 +413,11 @@ class PooledMLP(nn.Module):
                     E = p.router_rows()
                     z = F.linear(flat + self.depth_emb,
                                  self.router.weight[:E]).float()
+                    # the routing bias (pool.route_bias), where experts are
+                    # chosen: which ones a character asks for. What each
+                    # request carries is still the router's own probability.
+                    sb = (p.selection_bias() if hasattr(p, "selection_bias")
+                          else None)
 
                     def requested(scores):
                         q = F.softmax(scores, -1)
@@ -421,10 +426,13 @@ class PooledMLP(nn.Module):
                             # temperature 0 the card is drawn from the
                             # text's whole distribution, row by row
                             return q.float().sum(0)
-                        tq = torch.topk(q, min(self.top_k, E), dim=-1)
+                        pick = (scores if sb is None
+                                else scores + sb[:E].to(scores.dtype))
+                        top = torch.topk(pick, min(self.top_k, E),
+                                         dim=-1).indices
                         mass = torch.zeros(E, device=q.device)
-                        mass.index_add_(0, tq.indices.reshape(-1),
-                                        tq.values.reshape(-1).float())
+                        mass.index_add_(0, top.reshape(-1),
+                                        q.gather(1, top).reshape(-1).float())
                         return mass
                     mass = requested(z)
                 # THE BALANCE TERM (pool.balance), once per forward that
@@ -455,13 +463,23 @@ class PooledMLP(nn.Module):
             logits = logits.masked_fill(~p.admitted_mask(), float("-inf"))
         probs = F.softmax(logits, dim=-1)
         k = min(self.top_k, n)
+        # the routing bias (pool.route_bias) moves which experts a character
+        # takes and nothing else: the weights below are the router's own
+        sb = (p.selection_bias() if hasattr(p, "selection_bias") else None)
+        if sb is not None:
+            sb = (sb[rows] if rows is not None else sb[:n]).to(logits.dtype)
         if temp > 0:
             # drawn, not taken (Gumbel-top-k on the scores over T): weighted,
             # like a taken expert, by the router's own probability
             keys = logits.detach()
+            if sb is not None:
+                keys = keys + sb
             gum = -torch.log(-torch.log(
                 torch.rand_like(keys).clamp_(1e-12, 1 - 1e-7)))
             idx = torch.topk(keys / temp + gum, k, dim=-1).indices
+            w = probs.gather(1, idx)
+        elif sb is not None:
+            idx = torch.topk(logits.detach() + sb, k, dim=-1).indices
             w = probs.gather(1, idx)
         else:
             w, idx = torch.topk(probs, k, dim=-1)
@@ -482,9 +500,29 @@ class PooledMLP(nn.Module):
             srt = torch.sort(probs, dim=-1, descending=True).values
             cum = srt.cumsum(-1)
             want = (cum < 0.90).sum(-1).float().mean() + 1
-        w = w / w.sum(-1, keepdim=True)
         g = p.routable_gate() if hasattr(p, "routable_gate") else p.gate
-        w = w * g[idx].to(w.dtype)
+        gi = g[idx].to(w.dtype)
+        after = getattr(p, "gate_after", False)
+        if after:
+            # WEIGHTED AFTER THE GATES (pool.gate_after): each chosen expert's
+            # share is its probability times its gate, over the chosen
+            # experts' total, so one with a small gate takes only the small
+            # share its gate gives it. Weighted before them, as below, the
+            # shares add up to one first: choosing an expert gated near zero
+            # takes weight from the strong experts beside it, and the router
+            # learns to avoid it.
+            wa = w * gi.abs()
+            q = wa.sum(-1, keepdim=True).clamp_min(1e-9)
+            w = w * gi / q
+            if after == "scaled":
+                # ...and scaled by the chosen experts' own gates, averaged
+                # by those shares - so experts gated alike are mixed exactly
+                # as they are weighted before the gates, and only a weak one
+                # among them changes anything: it no longer dilutes
+                w = w * (wa * gi.abs()).sum(-1, keepdim=True) / q
+        else:
+            w = w / w.sum(-1, keepdim=True)
+            w = w * gi
         if self.record_weights:
             # What each chosen expert actually contributes, AFTER the gate.
             # last_route records how often a slot was picked, which is 1/k for
@@ -702,9 +740,10 @@ def split_trunk_pool(model):
     split every learner steps by, so a stream that carries training on (chat,
     a test read while learning - minagi/live.py) gives each parameter the rate
     training gives it. The pool's are its experts, its gate, and every routing
-    site's router rows and depth embedding: a newborn expert's gate and router
-    rows move at its own rate, so they belong with its weights. Split by name
-    instead, the router rows land in the trunk and learn at its tenth.
+    site's router rows and depth embedding: a router row and a gate belong to
+    one expert as its weights do, so they learn at the pool's rate with them.
+    Split by name instead, the router rows land in the trunk and learn at its
+    tenth.
 
     A resident pool keeps its experts as modules; a paged pool keeps three
     stacked slot tensors instead, so the set has to be found by asking the

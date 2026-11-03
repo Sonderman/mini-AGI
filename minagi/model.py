@@ -9,6 +9,7 @@ window extends by continued training rather than by re-initialising anything -
 see stream.ramp_context.
 """
 
+import contextlib
 import os
 
 import torch
@@ -302,6 +303,63 @@ def blocked_attention(q, k, v, P, block=512):
     return _BlockedAttention.apply(q, k, v, P, block)
 
 
+@torch.no_grad()
+def largest_logit(q, k, offset, rows=512):
+    """The largest score any query gives a key it may see - q.k / sqrt(d),
+    what softmax is taken of - over every head, as a 0-dim float tensor on
+    q's device, so a caller waits for the card once rather than per call.
+    Query i sees the keys up to offset + i.
+
+    `rows` queries at a time, so the whole score matrix is never held, and
+    in q's own dtype - on the card the compute dtype the kernel is handed -
+    so this costs about what the scores do. Each block's queries all see
+    the keys up to its first query's position, which need no mask; only the
+    few keys after that, one more per query, are masked.
+    """
+    T, S = q.shape[2], k.shape[2]
+    kt = k.transpose(-1, -2)
+    best = torch.full((), float("-inf"), device=q.device)
+    for i in range(0, T, rows):
+        qb = q[:, :, i:i + rows]
+        n, see = qb.shape[2], min(S, offset + i + 1)
+        if see > 0:
+            best = torch.maximum(best, (qb @ kt[..., :see]).amax().float())
+        end = min(S, offset + i + n)
+        if end > see:
+            last = torch.arange(n, device=q.device)[:, None] + (offset + i)
+            keys = torch.arange(see, end, device=q.device)[None, :]
+            sc = (qb @ kt[..., see:end]).masked_fill(keys > last,
+                                                     float("-inf"))
+            best = torch.maximum(best, sc.amax().float())
+    return best * q.shape[3] ** -0.5
+
+
+@contextlib.contextmanager
+def watch_logits(model):
+    """
+    The largest attention logit each attention of `model` computes inside
+    it (largest_logit), in the dict it yields - filled on the way out, by
+    module name. Nothing is kept outside it.
+
+    WHY WATCH IT. Under Muon the largest logit tends to grow as training goes
+    on (Liu et al. 2025, the optimiser minagi/muon.py follows), and a softmax
+    whose largest logit runs away saturates on one key. A check reads the
+    same held-out blocks every time, so this is a series to watch.
+    """
+    mods = [(n, m) for n, m in model.named_modules()
+            if isinstance(m, Attention)]
+    for _, m in mods:
+        m.watching, m.largest = True, None
+    out = {}
+    try:
+        yield out
+    finally:
+        for n, m in mods:
+            if m.largest is not None:
+                out[n] = float(m.largest)
+            m.watching, m.largest = False, None
+
+
 class Attention(nn.Module):
     def __init__(self, cfg):
         super().__init__()
@@ -309,6 +367,7 @@ class Attention(nn.Module):
         self.head_dim = cfg.d_model // cfg.n_head
         self.qkv = nn.Linear(cfg.d_model, 3 * cfg.d_model, bias=False)
         self.proj = nn.Linear(cfg.d_model, cfg.d_model, bias=False)
+        self.watching, self.largest = False, None     # see watch_logits
 
     def forward(self, x, cos, sin, cache=None):
         B, T, C = x.shape
@@ -352,6 +411,10 @@ class Attention(nn.Module):
 
         # Without a fused kernel for the case at hand, blocked_attention.
         kv_len = k.shape[2]
+        if self.watching:
+            top = largest_logit(q, k, kv_len - T)
+            self.largest = (top if self.largest is None
+                            else torch.maximum(self.largest, top))
         if T == 1:
             # one query, at the newest position: it sees every key, so no mask
             # is built - and none is needed for a fast kernel to take it. Its

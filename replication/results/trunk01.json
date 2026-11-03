@@ -8,7 +8,7 @@
  ],
  "visit": 16,
  "rotating": false,
- "weights": "/tmp/claude-1000/-home-alex-Desktop-Github-Experiments-Preservation/76e79af2-b516-4f76-9d3c-e5ca2dae92a8/scratchpad/cl/w",
+ "weights": "a copy of weights/",
  "step": 223506,
  "experts_total": 174,
  "eval_chunks": 16,

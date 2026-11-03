@@ -466,22 +466,33 @@ class PagedPool(nn.Module):
                              persistent=False)
         self.usage_steps = 1000.0        # how far back `recent` looks
         self._trains = False             # whether this forward trains
-        # EACH EXPERT'S OWN LEARNING RATE, as a multiple of the main one the
-        # plasticity controller sets - only while `newborn_rate` is on
-        # (training.newborn_lr). An expert the pool had before keeps 1.0. One
-        # born under the rule starts at 1 / (the main rate at its birth),
-        # which is the full base rate, and how far above the main rate it is
-        # - log(rate) - halves with every `rate_half` steps it is trained, so
-        # it joins the main rate as it matures and one that sits idle keeps
-        # what it has. Its weights, its gate and its router rows all move at
-        # it: see _rate_before and _rate_after.
-        self.register_buffer("rate", torch.ones(n_experts), persistent=False)
-        self.register_buffer("trained", torch.zeros(n_experts),
-                             persistent=False)  # steps since relax_rates()
-        self.newborn_rate = False
-        self.rate_half = 15000.0
-        self.main_scale = 1.0            # the main rate's factor, set per step
-        self._rate_snap = None
+        # THE ROUTING BIAS (pool.route_bias) - an offset per expert, added to
+        # the router's scores where experts are CHOSEN (what a character asks
+        # the card for, and its top_k among the card) and nowhere else: the
+        # weights the chosen are mixed with stay the router's own, and nothing
+        # of it enters the loss. After every optimiser step it moves each
+        # expert's offset by `route_bias`, by sign, toward the share of
+        # training choices its rank should have - 1 / (rank + offset),
+        # normalised - as the auxiliary-loss-free balancing of DeepSeek-V3
+        # does toward an even share, and centred as Moonlight centres it.
+        # `chosen` is each expert's share of training choices, a running
+        # average over about fifty steps. Both are saved with the weights, so
+        # reading and chat choose as training does; with the setting at 0 the
+        # offsets are not used at all.
+        self.register_buffer("bias", torch.zeros(n_experts), persistent=False)
+        self.register_buffer("chosen", torch.zeros(n_experts),
+                             persistent=False)
+        self.register_buffer("_step_hits", torch.zeros(n_experts),
+                             persistent=False)
+        self.route_bias = 0.0
+        self.route_bias_offset = 25.0
+        self.route_bias_max = 4.0
+        self.chosen_steps = 50.0
+        # WEIGHTED AFTER THE GATES (pool.gate_after) - see PooledMLP._route
+        self.gate_after = False
+        # A NEWBORN'S GATE as a share of its parents' (growth.birth_gate_parents)
+        # - 0 starts it at the birth_gate it is given instead
+        self.birth_gate_parents = 0.0
         # THE BALANCE TERM - a term in the loss, `balance` its weight, that
         # charges the router for the probability it puts on each expert in
         # proportion to that expert's share of recent admissions. Computed by
@@ -622,10 +633,48 @@ class PagedPool(nn.Module):
         return self.gate[self._slot_rows(self.gate.device)]
 
     def note_use(self, hit):
-        """Routing counts arrive per SLOT; usage is kept per EXPERT."""
-        self.use.index_add_(0, self._slot_rows(self.use.device),
-                            hit.to(self.use.dtype))
+        """Routing counts arrive per SLOT; usage is kept per EXPERT. A forward
+        that trains also counts them toward this step's choices, which the
+        routing bias steers by."""
+        rows = self._slot_rows(self.use.device)
+        self.use.index_add_(0, rows, hit.to(self.use.dtype))
+        if self._trains:
+            self._step_hits.index_add_(0, rows, hit.to(self._step_hits.dtype))
         self.age += 1
+
+    def selection_bias(self):
+        """The routing bias over the whole pool, or None while it is off."""
+        if not self.route_bias:
+            return None
+        return self.bias[:self._n]
+
+    @torch.no_grad()
+    def _steer_bias(self, *_):
+        """After a step: this step's training choices into `chosen`, and every
+        offset one step of `route_bias` toward its rank's share of the curve
+        1 / (rank + route_bias_offset) - see `bias`."""
+        n = self._n
+        h = self._step_hits[:n].clone()
+        self._step_hits.zero_()
+        if not self.route_bias:
+            return
+        tot = float(h.sum())
+        if tot <= 0:
+            return
+        c = self.chosen[:n]
+        b = 1.0 / max(self.chosen_steps, 1.0)
+        c.mul_(1.0 - b).add_(b * h / tot)
+        order = torch.argsort(c, descending=True)
+        curve = 1.0 / (torch.arange(n, device=c.device, dtype=c.dtype)
+                       + float(self.route_bias_offset))
+        target = torch.empty_like(c)
+        target[order] = curve / curve.sum()
+        # centred, as Moonlight steps DeepSeek-V3's offsets (Liu et al.
+        # 2025, appendix C): the same choices, since moving every offset
+        # alike moves no choice, and no drift of them all toward the clamp
+        s = torch.sign(target - c)
+        self.bias[:n] += float(self.route_bias) * (s - s.mean())
+        self.bias[:n].clamp_(-self.route_bias_max, self.route_bias_max)
 
     def n_params(self):
         per = 3 * self.d_model * self.d_ff
@@ -1027,79 +1076,6 @@ class PagedPool(nn.Module):
             self._own = [e >= 0 for e in self.slots]
             self._own_in = [weakref.ref(o["exp_avg"]) for o in sts]
 
-    # -- each expert's own rate - see `rate` --------------------------------
-    def rates(self):
-        """Each expert's rate as a step applies it: never above the base."""
-        cap = 1.0 / max(float(self.main_scale), 1e-9)
-        return self.rate[:self._n].clamp(max=cap)
-
-    @torch.no_grad()
-    def _rate_before(self, *_):
-        """What every faster expert's parameters were before the step."""
-        self._rate_snap = None
-        if not self.newborn_rate:
-            return
-        rc = self.rates().cpu()              # one wait for the card a step
-        fast = (rc > 1.0).nonzero().flatten()
-        if not fast.numel():
-            return
-        dev = self.gate.device
-        snap = {"fast": fast.to(dev), "r": rc[fast].to(dev, self.gate.dtype)}
-        snap["gate"] = self.gate.data[snap["fast"]].clone()
-        snap["rows"] = [s.router.weight.data[snap["fast"]].clone()
-                        for s in self._sites]
-        held = [s for s, i in enumerate(self.slots)
-                if i >= 0 and float(rc[i]) > 1.0]
-        if held:
-            si = torch.tensor(held, device=self.w1.device)
-            rs = torch.tensor([float(rc[self.slots[s]]) for s in held],
-                              device=self.w1.device)
-            snap["slots"] = (si, rs, [p.data[si].clone()
-                                      for p in (self.w1, self.w3, self.w2)])
-        self._rate_snap = snap
-
-    @torch.no_grad()
-    def _rate_after(self, *_):
-        """
-        Stretch the step every faster expert just took by its rate. AdamW
-        moves a parameter by lr times things lr does not change - the ratio of
-        its moments, and its decay - so scaling the change it just made is
-        exactly a step at rate x lr, for its weights, its gate and its router
-        rows alike, and nothing else in the pool is touched.
-        """
-        on = [i for i in self.slots if i >= 0]
-        if on:
-            self.trained.index_add_(
-                0, torch.tensor(on, device=self.trained.device),
-                torch.ones(len(on), device=self.trained.device))
-        s, self._rate_snap = self._rate_snap, None
-        if s is None:
-            return
-        fast, r = s["fast"], s["r"]
-        g = self.gate.data
-        g[fast] = s["gate"] + r * (g[fast] - s["gate"])
-        for site, old in zip(self._sites, s["rows"]):
-            w = site.router.weight.data
-            w[fast] = old + r[:, None].to(w.dtype) * (w[fast] - old)
-        if "slots" in s:
-            si, rs, olds = s["slots"]
-            for p, old in zip((self.w1, self.w3, self.w2), olds):
-                k = rs.view((-1,) + (1,) * (p.dim() - 1)).to(p.dtype)
-                p.data[si] = old + k * (p.data[si] - old)
-
-    @torch.no_grad()
-    def relax_rates(self):
-        """
-        Bring every expert's rate toward the main one by how much it has been
-        trained since the last call: log(rate) halves every `rate_half` steps
-        of its own training. One that was not trained keeps its rate.
-        """
-        n = self._n
-        far = torch.log(self.rate[:n].clamp_min(1.0))
-        self.rate[:n] = torch.exp(far * torch.pow(0.5, self.trained[:n]
-                                                  / self.rate_half))
-        self.trained.zero_()
-
     # -- growing and pruning ----------------------------------------------
     @torch.no_grad()
     def add_experts(self, k, seed_from=None, device=None, step=0,
@@ -1216,11 +1192,21 @@ class PagedPool(nn.Module):
         # a newborn has been used by nothing, so the balance term pulls its row
         # up from the first training forward after its birth
         self.recent = grow_vec(self.recent, 0.0)
-        # under the newborn rule it starts at the base rate, however far the
-        # main one has come down - see `rate`
-        self.rate = grow_vec(self.rate, 1.0 / max(float(self.main_scale), 1e-9)
-                             if self.newborn_rate else 1.0)
-        self.trained = grow_vec(self.trained, 0.0)
+        self.bias = grow_vec(self.bias, 0.0)
+        self.chosen = grow_vec(self.chosen, 0.0)
+        self._step_hits = grow_vec(self._step_hits, 0.0)
+        if self.birth_gate_parents > 0:
+            # a share of its parents' gates, weighted by the units each gave,
+            # instead of birth_gate: inherited units compute something, so
+            # the newborn can have a say from the start
+            gd = self.gate.data
+            for j, spec in enumerate(lineage):
+                if spec is None:
+                    continue
+                par, sh = spec
+                pg = gd[par.to(gd.device)].abs().float()
+                gd[self._n - k + j] = float(self.birth_gate_parents) * float(
+                    (pg * sh.to(gd.device).float()).sum())
 
         # the routers keep one row per expert, so they grow too - each new
         # row the unit-weighted average of its parents' rows (see above)
@@ -1356,7 +1342,8 @@ class PagedPool(nn.Module):
         self.gate = nn.Parameter(self.gate.data[idx].clone())
         self._carry(opt, old_gate, self.gate, idx=idx)
         for nm in ("use", "age", "born", "gate_seen", "last_seen", "ever",
-                   "admits", "uid", "recent", "rate", "trained"):
+                   "admits", "uid", "recent", "bias", "chosen",
+                   "_step_hits"):
             setattr(self, nm, getattr(self, nm)[idx].clone())
         # Give every router a NEW parameter rather than reshaping the one it
         # has. Autograd sizes a gradient from the tensor it saved, so shrinking
@@ -1420,7 +1407,8 @@ class PagedPool(nn.Module):
                 "born": [float(v) for v in self.born],
                 "last_seen": [float(v) for v in self.last_seen],
                 "recent": [round(float(v), 6) for v in self.recent],
-                "rate": [round(float(v), 6) for v in self.rate],
+                "bias": [round(float(v), 6) for v in self.bias],
+                "chosen": [round(float(v), 8) for v in self.chosen],
                 "ever": [bool(v) for v in self.ever],
                 "uid": [int(v) for v in self.uid],
                 "next_uid": int(self.next_uid),
@@ -1431,7 +1419,7 @@ class PagedPool(nn.Module):
         if not t:
             return
         for nm in ("use", "admits", "born", "last_seen",
-                   "gate_seen", "recent", "rate"):
+                   "gate_seen", "recent", "bias", "chosen"):
             v = t.get(nm)
             if not v:
                 continue
@@ -1469,9 +1457,8 @@ class PagedPool(nn.Module):
         self._opt = opt
         if opt is not None and id(opt) not in self._hooked:
             opt.register_step_pre_hook(self._own_moments)
-            opt.register_step_pre_hook(self._rate_before)
             opt.register_step_post_hook(self._count_step)
-            opt.register_step_post_hook(self._rate_after)
+            opt.register_step_post_hook(self._steer_bias)
             self._hooked.add(id(opt))
 
     def attach_sites(self, model):

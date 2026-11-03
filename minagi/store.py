@@ -31,6 +31,7 @@ interrupted save cannot leave a half-written weight behind.
 import json
 import os
 import sys
+import time
 
 import numpy as np
 import torch
@@ -38,6 +39,27 @@ import torch
 from .precision import pack_bf16, unpack_bf16
 
 CORE, ROUTERS, EXPERTS, OPTIM = "core", "routers", "experts", "optim"
+
+
+def _replace(tmp, dst, attempts=8 if os.name == "nt" else 1):
+    """
+    os.replace, which is what makes a save atomic, retried on Windows.
+
+    Windows refuses to replace a file another process has open without delete
+    sharing - a plotter reading manifest.json at that moment is enough - and
+    such a reader lets go within milliseconds. So a PermissionError there is
+    tried again, waiting 0.05 s and doubling, 6.35 s in all over 8 attempts,
+    then raised; any other error is raised at once. Elsewhere a rename is
+    never blocked by a reader, and one attempt is all there is.
+    """
+    for i in range(attempts):
+        try:
+            os.replace(tmp, dst)
+            return
+        except PermissionError:
+            if i == attempts - 1:
+                raise
+            time.sleep(0.05 * 2 ** i)
 
 
 def _is_expert(key):
@@ -144,7 +166,7 @@ def save(model, path, step=None, val=None, opt=None, cfg=None, verbose=False,
     tmp = os.path.join(path, "manifest.json.tmp")
     with open(tmp, "w") as f:
         json.dump(manifest, f, indent=1)
-    os.replace(tmp, os.path.join(path, "manifest.json"))
+    _replace(tmp, os.path.join(path, "manifest.json"))
     if verbose:
         n_files = len(entries) + 3
         print(f"  weights/: {len(entries)} experts + 3 bundles = {n_files} files, "
@@ -250,7 +272,7 @@ def _save_paged(model, pool, path, step, val, opt, cfg, verbose, extra=None):
     tmp = os.path.join(path, "manifest.json.tmp")
     with open(tmp, "w") as f:
         json.dump(manifest, f, indent=1)
-    os.replace(tmp, os.path.join(path, "manifest.json"))
+    _replace(tmp, os.path.join(path, "manifest.json"))
     if verbose:
         print(f"  weights/: {len(entries)} experts + 3 bundles, "
               f"{total/1e6:.1f} MB (paged - experts were already on disk)")
@@ -261,7 +283,7 @@ def _savez(path, arrays):
     """Atomic bundle write."""
     tmp = path + ".tmp.npz"
     np.savez(tmp, **arrays)
-    os.replace(tmp, path)
+    _replace(tmp, path)
     return sum(a.nbytes for a in arrays.values())
 
 
@@ -507,15 +529,13 @@ def best_val(path):
     """
     Validation loss of the state on disk, or inf if there is none.
 
-    The directory holds the best state the model has reached, not the most
-    recent one: `save` is called only when a run improves on it. A second copy
-    kept aside as a snapshot would double a figure that is already 236 MB and
-    grows with the pool, and it would be a copy of exactly what is already
-    here.
-
-    That makes the directory the thing to fall back to. A run that diverges
-    reloads it and carries on, which costs the steps since the last
-    improvement and nothing more.
+    What that state is depends on who wrote it. `train.py stream` saves only
+    when a run improves on it, so there the directory holds the best state and
+    is what a diverging run falls back to. `train.py read` saves its latest
+    state at every held-out check, with that check's loss, and every few
+    minutes and at its end with none - so after a read the directory is where
+    the model last stood, and this is inf whenever the last save came between
+    checks.
     """
     f = os.path.join(path, "manifest.json")
     if not os.path.exists(f):

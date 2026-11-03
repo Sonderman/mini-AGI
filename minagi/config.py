@@ -14,8 +14,10 @@ DEFAULT = os.path.join(ROOT, "config.yaml")
 
 
 def load(path=None):
+    """config.yaml, or the file MINAGI_CONFIG names - which is how a run that
+    compares settings gives each arm its own (tools/ab_pool.py)."""
     import yaml
-    path = path or DEFAULT
+    path = path or os.environ.get("MINAGI_CONFIG") or DEFAULT
     if not os.path.exists(path):
         return {}
     with open(path) as f:

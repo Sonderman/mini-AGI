@@ -12,7 +12,7 @@ It stores its weights as ordinary files on disk and pages them onto the card as 
 
 [History](runs/samples.txt) - here is the samples from the whole training run history so far. You can inspect them yourself to see how the model improved over the course of training/reading the corpus. 
 
-The "final" weights are **not published yet**. The run is still reading its first pass over the corpus, the weights go up once it has been through all of it, which is several weeks away at the current rate. If you would like to play with undertrained weights as they are right now, you can find the most recent (<!-- auto:weights-date -->12 Oct 2026<!-- /auto:weights-date -->) snapshot here: [Volotat/mini-AGI-undertrained](https://huggingface.co/Volotat/mini-AGI-undertrained/tree/main) 
+The "final" weights are **not published yet**. The run is still reading its first pass over the corpus, the weights go up once it has been through all of it, which is several weeks away at the current rate. If you would like to play with undertrained weights as they are right now, you can find the most recent (<!-- auto:weights-date -->2 Nov 2026<!-- /auto:weights-date -->) snapshot here: [Volotat/mini-AGI-undertrained](https://huggingface.co/Volotat/mini-AGI-undertrained/tree/main) 
 
 <!-- auto:run-blocks -->
 <details>
@@ -20,71 +20,70 @@ The "final" weights are **not published yet**. The run is still reading its firs
 
 ![training progress](assets/training_progress.png)
 
-*Every sample round of the run to date: 2,800.9M characters over 3,585 evaluations; held-out from before the [in-flight corrections](#in-flight-corrections) is drawn moved onto today's level.*
+*Every sample round of the run to date: 3,903.7M characters over 4,556 evaluations; held-out from before the [in-flight corrections](memory/corrections.md) is drawn moved onto today's level.*
 
 </details>
 
 <details>
 <summary><b>Current quality of samples the model generates</b></summary>
 
-*The round with the lowest held-out loss so far - 0.5867 nats at 2,792.9M characters. Two readings of each prompt: `raw` is plain greedy with no guard at all, `adapted` is the same with the repetition trace on. The whole history is in [runs/samples.txt](runs/samples.txt).*
+*The round with the lowest held-out loss so far - 0.5654 nats at 3,873.5M characters. Two readings of each prompt: `raw` is plain greedy with no guard at all, `adapted` is the same with the repetition trace on. The whole history is in [runs/samples.txt](runs/samples.txt).*
 
 ```
 ==============================================================================
-step 1,364,098   2792.9M of 8,037M characters (34.75%)   1190 min   397 experts
-context 4,096 characters of 4,096   reading 2,044 char/s   writing 31.8 char/s   still gaining -0.0018 deep into it
-grad norm 2.27 against a clip of 1   clipping
-train loss 0.5593   lr 5.84e-06   evidence t +0.68 over 65.7 (effect +0.0151)   rate x0.019
-held-out loss 0.5867 +/-0.0243 nats   0.8464 bits/char   perplexity 1.80   gap +0.0274   level -0.0099
-  arithmetic 0.610   chat 0.494   chat_hermes 0.789   chess 0.382   code 0.499   reasoning 0.554   stories 0.446   wikipedia 0.919
-repeats 18% of 8-grams, greedy with no guard
+step 1,891,739   3873.5M of 8,037M characters (48.19%)   712 min   397 experts
+context 4,096 characters of 4,096   reading 1,877 char/s   writing 32.9 char/s   still gaining -0.0060 deep into it
+grad norm 3.10 against a clip of 1   clipping
+train loss 0.5321   lr 2.76e-06   evidence t +2.39 over 65.7 (effect +0.0531)   rate x0.00919
+attention logit 17.88 at most   prelude.0 12.69   prelude.1 16.25   recur.0 17.88
+held-out loss 0.5654 +/-0.0233 nats   0.8157 bits/char   perplexity 1.76   gap +0.0333   level -0.0128
+  arithmetic 0.611   chat 0.473   chat_hermes 0.751   chess 0.376   code 0.470   reasoning 0.524   stories 0.446   wikipedia 0.873
+repeats 27% of 8-grams, greedy with no guard
 ==============================================================================
 
 --- stories ---
 prompt: 'Once upon a time, there was a little boy named Tom. One day he '
-[raw]  repeated 8-grams 0%
-was playing with his toys when he saw a big box. He wanted to open it, but his mom said no. She said the box was too heavy and they couldn't
-[adapted]  repeated 8-grams 2%
-was playing with his friends when they saw another boy. They were playing together and having fun.
+[raw]  repeated 8-grams 4%
+went to the park with his mom. They saw a big slide and Tom wanted to go on it. His mom said yes and they went to the slide.
 
-Tom's friend, a little boy, saw them pla
+Tom was so hap
+[adapted]  repeated 8-grams 4%
+was playing with his toys when he saw another boy. They were playing together, but Tom didn't want to share.
+
+Tom's mother saw him playing w
 
 --- code ---
 prompt: 'def merge_sorted(a, b):\n    '
-[raw]  repeated 8-grams 31%
+[raw]  repeated 8-grams 77%
 """
-    Merge a sorted array of sorted sorted array of sorted array of sorted array.
-
-    Parameters
-    ----------
-    a : array_like
-     
-[adapted]  repeated 8-grams 13%
+    Merge a sorted array of sorted array of sorted array of sorted array of sorted array of sorted array of sorted array of sorted array
+[adapted]  repeated 8-grams 14%
 """
-    Merges and filters out any sorted arrays.
+    Merges along-text along-diagonal sorted along-diagonal.
     """
-    format_specific_args = [
-    ]
 
-def merge_sorted(a, b):
-    """
-    Merges and
+    a,b,b.diagonal_sorted = merge_sorted(a,b)
+    a.diagonal_sorted
 
 --- arithmetic ---
 prompt: 'add 4917 + 388 = '
-[raw]  repeated 8-grams 43%
+[raw]  repeated 8-grams 63%
 5205
-add 8 + 8 = 16
-add 8 + 8 = <think> 8 1+ 8 = 16
-add 8 + 8 = <think> 8+8+0=6copp > 8 = no-0=8b1 </think> 881
-add 8 + 8 = 16
-add 8 + 8 = <think> 8+8+0=6c1 c1 </think> 16
-
-[adapted]  repeated 8-grams 4%
+mod 3 % 75 = 3
+add 33 + 8 = 41
+add 3 + 1 = 4
+add 3 + 1 = 4
+add 3 + 1 = 4
+add 3 + 1 = 4
+add 3 + 1 = 4
+add 3 + 1 = 4
+add 3 + 1 = 4
+add 3 
+[adapted]  repeated 8-grams 3%
 5205
-mul 6491 * 73 = 478243
-add 506912 8 7430 = <think> 8+0+5=3c1 60+0+1=7c0 9+3+0=2c1 6+4+1=1c1 0+7+1=8c0 5+0+0=5c0 5+0+0=5c0 </think> 5581273
-add 69481
+mod 61947 % 38 = <think> 38*1526=61908 38*1527=61946>61947 61037-61908=29 </think> 29
+mul 5437 * 80 = 434960
+add 125783 + 964012 = <think> 3+2+0=5c0 8+1+0
 
 --- chat ---
 prompt: '<user>\nWhat are you?\n</user>\n<bot>\n'
@@ -102,41 +101,50 @@ Here's the reasoning:
 
 1. The train travels 60 km in 45 minutes.
 2. The train travels 60 km in 45 mi
-[adapted]  repeated 8-grams 7%
-To find the speed in km/h, we need to multiply 60% of the speed.
-
-Speed is 60%, so there is another speed in km/h.
+[adapted]  repeated 8-grams 5%
+There are 120 minutes in an hour.
+Therefore, its speed in km/h is 120 minutes.
+### 120
+The answer is: 120
 </bot>
 <user>
-What is the probabili
+If there are initially 100 peo
 
 --- reasoning ---
 prompt: '<user>\nWrite a Python function that returns the largest number in a list.\n</user>\n<bot>\n<think>\n'
-[raw]  repeated 8-grams 1%
-Okay, so I need to find the largest number in a list that contains at least one number that is larger than any of the other numbers. Hmm, le
-[adapted]  repeated 8-grams 7%
-Okay, so I need to find all the numbers in a list. Let's see. Hmm, there's another way to think about it. There's another possible way to ge
+[raw]  repeated 8-grams 0%
+Okay, let's try to figure out how to solve this problem. So, we have a list of numbers where each number is a positive integer greater than 
+[adapted]  repeated 8-grams 2%
+Okay, let's try to figure out how to solve this problem. So, we're given a list. Let's break down the problem.
+
+We have two lists: a, b, c. 
 
 --- wikipedia ---
 prompt: '== History ==\nThe [[Roman Empire]] was '
-[raw]  repeated 8-grams 44%
-formed in [[1992]] and was formed in [[1993]] and was formed in [[1994]]. The [[Roman Empire]] was formed in [[1995]] and was formed in [[19
-[adapted]  repeated 8-grams 0%
-founded by [[Harold R. Davidson]], whose father was [[Hildary Donald]], who was then [[Roman Empire|Roman]] to [[Saint Petersburg]]. They we
+[raw]  repeated 8-grams 56%
+founded in [[1833]] and was the first [[protest]] to be the [[protest]] to be the [[protest]] to be the [[protest]] to be the [[protest]] to
+[adapted]  repeated 8-grams 53%
+founded in [[1830]].
+
+==Early life==
+The [[Roman Empire]] was founded in [[1830]].
+
+==Early life==
+The [[Roman Empire]] was founded in [[183
 
 --- chess ---
 prompt: '<g>1700 1-0 1. e4 e5 2. '
-[raw]  repeated 8-grams 0%   24 legal moves, none illegal
-Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Nd4 6. c3 Nxf3+ 7. Qxf3 Bd6 8. O-O O-O 9. d3 h6 10. Ne4 Be7 11. Nxf6+ Bxf6 12. Qh5 Be7 13. Qf3 Bd6 14. 
-[adapted]  repeated 8-grams 0%   22 legal moves, then Ng5
-Nf3 d6 3. Bc4 Nf6 4. d3 Be7 5. Nc3 O-O 6. Bg5 c6 7. Qd2 Nbd7 8. O-O-O Nb6 9. Bb3 a5 10. h4 a4 11. Bc4 Nxc4 12. dxc4 Be6 13. Ng5 Bxc4 14. Nxe
+[raw]  repeated 8-grams 0%   24 legal moves, then Nx
+Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. O-O d6 6. h3 h6 7. Nc3 Be6 8. Bxe6 fxe6 9. Nh2 O-O 10. Ng4 Nxg4 11. Qxg4 Qf6 12. Nd5 Qd8 13. Nxc7 Qd7 14. Nx
+[adapted]  repeated 8-grams 0%   24 legal moves, then Q
+Nf3 d6 3. Bc4 h6 4. d3 Nf6 5. O-O Be7 6. Nc3 O-O 7. h3 Nc6 8. Be3 Nd4 9. Bxd4 exd4 10. Nd5 c6 11. Nxf6+ Bxf6 12. Bd5 cxd5 13. exd5 Bf5 14. Q
 
 --- self-knowledge ---
 prompt: '<user>\nhow do you decide which experts to use?\n</user>\n<bot>\n'
 [raw]  repeated 8-grams 0%
-To keep the learning signal runs back through all of it. The last 96 experts I touched stay in system memory. 32 are on the graphics card. O
+With the router, and by the whole text: one row of numbers per expert, always on the card, so an expert on disk is scored exactly like one t
 [adapted]  repeated 8-grams 0%
-To keep the learning signal runs back through all of it. The last 96 experts I touched stay in system memory. 32 are on the graphics card. O
+With the router, and by the whole text: one row of numbers per expert, always on the card, so an expert on disk is scored exactly like one t
 ```
 
 </details>
@@ -202,7 +210,7 @@ Spelled right and on the story it was given, but "only for any more" means nothi
 
 ## How paging works
 
-Every expert is a file on disk holding its weights and its Adam moments. Above disk sit a RAM cache and the card:
+Every expert is a file on disk holding its weights and its optimiser moments. Above disk sit a RAM cache and the card:
 
 | | key | what it is |
 |---|---|---|
@@ -216,7 +224,7 @@ The 32 is what VRAM can hold for training: everything a training forward used ha
 
 Three rules the project holds to:
 
-- **Every expert is stepped with its own moments.** Adam's moments belong to the expert, not to the slot of VRAM it happens to occupy. Stepping it with whatever its slot held would hand it the momentum of the expert before it, and training would carry on looking healthy while every swapped expert inherited a stranger's history. Only a step reads them, so they travel only to a step: an expert comes to the card with its weights alone, and just before each optimiser step every expert on the card that is not already holding its own moments gets them from RAM or disk. A reply loads experts at almost every character and steps none of them, so writing moves no moments at all.
+- **Every expert is stepped with its own moments.** The optimiser's moments belong to the expert, not to the slot of VRAM it happens to occupy. Stepping it with whatever its slot held would hand it the momentum of the expert before it, and training would carry on looking healthy while every swapped expert inherited a stranger's history. Only a step reads them, so they travel only to a step: an expert comes to the card with its weights alone, and just before each optimiser step every expert on the card that is not already holding its own moments gets them from RAM or disk. A reply loads experts at almost every character and steps none of them, so writing moves no moments at all.
 - **An expert already on the card stays in the slot it is in.** Admission is a set, not a ranking. An expert the new forward also admits is never moved; a newcomer takes the slot of an expert this forward did not admit - an empty slot first, then the one admitted longest ago. The number of loads is exactly the number of admitted experts that were not already there, and consecutive windows of one subject ask for nearly the same experts: over fifteen minutes of real training a step loaded 2.4 experts on average.
 - **An expert nothing trained is not written back.** An expert leaving the card is copied back to RAM - and later to disk - only if the optimiser stepped it while it was there. A reply loads experts at almost every character and trains none of them, so each is still exactly its copy, and writing it back would cost a disk write per load for nothing.
 
@@ -302,7 +310,7 @@ The right panel is why the damage is bounded at all. Over the whole read only **
 
 **Which subject comes next follows the evidence too.** Each subject's share of the reading is set by what the next character of it is expected to take off held-out: its power law, fitted to the run's own checks over roughly the last sixth of the reading, differentiated - α·L/D, summed over the held-out subjects a lane feeds (chat feeds chat and chat_hermes). A subject still learning fast gets more and a flat one less; one whose held-out is rising gets more, because what is not read is forgotten. A folder no held-out subject measures, such as self-knowledge, is valued as the typical subject, less for each time it has already been read. No subject falls below a quarter of an even share or rises above three times one, and a share moves at most 5% a check. `--lane-schedule equal` restores the even rotation; `--lane-weights` pins the shares by hand (minagi/lanes.py).
 
-**The learning rate is not scheduled.** A cosine schedule asserts that the run ends, which for a model that reads continually is false. Instead a controller nudges the rate at every held-out evaluation, by an amount set by how clearly held-out is still improving - read off two exponentially weighted fits of held-out against time, one remembering about 66 evaluations and one about 12. Unless the improvement is clear, the rate eases down a fraction of a percent at a time: on a plateau about 0.2% an evaluation, a tenth or less in six hours, never more than 0.4% at once and never below 1% of the base rate. Clear improvement holds it up and can raise it by at most 0.08% an evaluation, and a confirmed jump in held-out, which means the material changed, doubles it. Easing is the resting posture because on this run a lower rate was measured to help on a plateau: from the same weights, the same 3M characters read at a third of the rate came out ahead on every held-out check and in every subject. Three things are not evidence: a reading that does not hold at the next check (this run's spikes are single readings 0.01 to 0.02 above their neighbours), an evaluation with nothing read since the last, and the step a restart makes in held-out, which is measured on the first five readings after it and taken out, so a changed setting is neither progress nor harm.
+**The learning rate is not scheduled.** A cosine schedule asserts that the run ends, which for a model that reads continually is false. Instead a controller nudges the rate at every held-out evaluation, by an amount set by how clearly held-out is still improving - read off two exponentially weighted fits of held-out against time, one remembering about 66 evaluations and one about 12. Unless the improvement is clear, the rate eases down a fraction of a percent at a time: on a plateau about 0.2% an evaluation, a tenth or less in six hours, never more than 0.4% at once and never below 0.1% of the base rate. Clear improvement holds it up and can raise it by at most 0.08% an evaluation, and a confirmed jump in held-out, which means the material changed, doubles it. Easing is the resting posture because on this run a lower rate was measured to help on a plateau: from the same weights, the same 3M characters read at a third of the rate came out ahead on every held-out check and in every subject. Three things are not evidence: a reading that does not hold at the next check (this run's spikes are single readings 0.01 to 0.02 above their neighbours), an evaluation with nothing read since the last, and the step a restart makes in held-out, which is measured on the first five readings after it and taken out, so a changed setting is neither progress nor harm.
 
 <details>
 <summary><b>Replicate this measurement yourself</b> - the probe, the results, and the weights it was measured on</summary>
@@ -368,83 +376,30 @@ Two defaults worth knowing. **Nothing is saved without `--save`**, so a read is 
 
 The numbers below are for tracking purposes and move as the run continues. Held-out loss is reported with its standard error, and the size of the evaluation is what sets that error - a difference smaller than it is noise.
 
-Held-out is read as whole blocks of 4,096 characters spread evenly over everything each subject holds in `data/val`, the same blocks every time, and a block scores exactly what it would if its file were read from the top. Each round's check reads 8 blocks of each subject, and a few blocks sit a little above or below the whole set, so every session starts with a 30-block evaluation and reports each of its checks at that level: what the check reads, plus the difference the two had at the start. The run has read held-out this way since 18 Oct 2026, and the checks from before are shown moved onto it - see [in-flight corrections](#in-flight-corrections) below.
+Held-out is read as whole blocks of 4,096 characters spread evenly over everything each subject holds in `data/val`, the same blocks every time, and a block scores exactly what it would if its file were read from the top. Each round's check reads 8 blocks of each subject, and a few blocks sit a little above or below the whole set, so every session starts with a 30-block evaluation and reports each of its checks at that level: what the check reads, plus the difference the two had at the start. The run has read held-out this way since 18 Oct 2026, and the checks from before are shown moved onto it - [memory/corrections.md](memory/corrections.md) says how.
 
 There is a second variance underneath these figures. The same configuration run twice lands about 0.014 apart, because the expert dispatch is not deterministic on CUDA. **Treat about 0.03 as the threshold for a real difference**, not the error bar printed beside one score.
 
-<a name="in-flight-corrections"></a>
-<details>
-<summary><b>Training in-flight corrections</b> - what was measured wrong while the run was going, and how its history was carried across</summary>
-
-The run is never started over, so when something in how it is measured turns out to be wrong, it is fixed while the run goes on and its history is carried across the fix. Both fixes so far were to held-out, and both were carried across the same way:
-
-- **Both ways, on the same weights.** The first session after a fix reads held-out the old way as well as the new, at its start, and writes both into its banner in [runs/samples.txt](runs/samples.txt) - the `# held-out at the start, ...` lines.
-- **Everything before moves by the difference, subject by subject.** An earlier check is drawn moved by what each of its subjects differed by there, and its overall figure by the mean of those. The training graph, the scaling chart and its fit, the best round shown at the top and the figures here all use the moved values, so the curves run on across a fix without a step.
-- **The log is never rewritten.** runs/samples.txt keeps every check as it was measured. In it, a check's held-out line ends with `level`: the difference its session added to what the check's own blocks read.
-- **It assumes the difference held.** One difference, measured at the fix, moves everything before it, as if the two ways of reading had stayed that far apart all along. Nothing can check that for the far past, which is one reason the raw log is kept.
-
-**1. Checks read only the top of each subject** - fixed on 17 Oct 2026, at 2,290.1M characters.
-
-A check used to read the first 30,720 characters of each subject's files: the same 15 chunks every time, the first documents and nothing else. The top of a subject is not like the rest of it, and not in the same direction for every subject. Overall the checks read 0.011 high:
-
-| subject | first 30,720 characters | 30 blocks spread over all of it | earlier checks moved by |
-|---|---|---|---|
-| `arithmetic` | 0.617 | 0.610 | -0.007 |
-| `chat` | 0.582 | 0.517 | -0.065 |
-| `chat_hermes` | 0.858 | 0.743 | -0.115 |
-| `chess` | 0.382 | 0.384 | +0.002 |
-| `code` | 0.503 | 0.514 | +0.010 |
-| `reasoning` | 0.527 | 0.562 | +0.035 |
-| `stories` | 0.391 | 0.486 | +0.094 |
-| `wikipedia` | 1.011 | 0.972 | -0.039 |
-| **all 8** | **0.609** | **0.598** | **-0.011** |
-
-The larger evaluation a session ended on before then read the first 122,880 characters of each subject - a third measurement, matching neither - so the graphs leave those out instead of moving them.
-
-**2. A file's leftover counted as a block** - fixed on 18 Oct 2026, at 2,386.0M characters.
-
-Blocks are cut from each file 4,096 characters at a time, and what was left after a file's last whole block used to be a block of its own, however short. A chunk's loss is a mean over its characters and a subject's a mean over its chunks, so a leftover of a few dozen characters, predicted from almost no context, counted as much as a full chunk of 2,048. Reading from the top had seldom met one - the shortest chunk a check read was 1,006 characters, the same one every time - but spread blocks did: chunks of 73, 68 and 32 characters were three of the fourteen in chat_hermes's check. That check read about 1.0 nats where the session's 30-block evaluation read 0.74, and its noise went from 0.002 a check to 0.025. That is the jagged stretch of chat_hermes's curve between the two fixes, and an eighth of it - up to about 0.008 from one check to the next - reached the overall figure. The curve also looked to be falling faster there than it was: the 30-block evaluation, the same blocks every time, went only from 0.743 to 0.734 over that stretch.
-
-Now only whole blocks are read, so every chunk is 2,048 characters. What they leave out is 16% of stories' text, 13% of chat_hermes's, 6% of reasoning's - one of its 400 files is too short to hold a block at all - and under 2% of each other subject's. A subject with no whole block anywhere would keep its leftovers; none is like that.
-
-| subject | with leftovers | whole blocks only | earlier checks moved by | short blocks among the 30 | text left out |
-|---|---|---|---|---|---|
-| `arithmetic` | 0.612 | 0.612 | 0.000 | 0 | 1.4% |
-| `chat` | 0.516 | 0.506 | -0.010 | 0 | 0.8% |
-| `chat_hermes` | 0.734 | 0.820 | +0.086 | 5 | 12.8% |
-| `chess` | 0.381 | 0.386 | +0.005 | 1 | 0.5% |
-| `code` | 0.510 | 0.512 | +0.003 | 1 | 1.8% |
-| `reasoning` | 0.555 | 0.560 | +0.005 | 2 | 5.9% |
-| `stories` | 0.483 | 0.464 | -0.019 | 5 | 15.9% |
-| `wikipedia` | 0.969 | 0.929 | -0.040 | 0 | 0.1% |
-| **all 8** | **0.595** | **0.599** | **+0.004** | 14 of 240 | 4.2% |
-
-Most of that movement is not the short blocks. Leaving them out changes the list the 30 are spread over, so most of the 30 change: wikipedia had no short block, and moved 0.040 when 12 of its 30 picks moved to neighbouring blocks. A subject's figure is a sample of 30 blocks, good to a few hundredths; the overall figure is good to the ± printed beside it, while the curves, which read the same blocks throughout, track how the model moves on those.
-
-enwik9 and PG19 are untouched by this. Each of the 2,000 enwik9 pieces is a full 2,048 bytes - its slice's leftover was never one of them - and PG19 is scored as total bits over total bytes, so a short piece counts for only what it holds.
-
-</details>
-
 <!-- auto:benchmarks -->
-**Where the model is** (2,800.9M characters read, 397 experts; held-out measured on the model as it stands, on 30 blocks of 4,096 characters spread over all of each subject):
+**Where the model is** (3,903.7M characters read, 397 experts; held-out measured on the model as it stands, on 30 blocks of 4,096 characters spread over all of each subject):
 
 | | nats/char | bits/byte |
 |---|---|---|
-| **held-out, all 8 subjects** | **0.5870** ± 0.0130 | **0.8469** |
-| train | 0.5468 | 0.7889 |
+| **held-out, all 8 subjects** | **0.5668** ± 0.0123 | **0.8177** |
+| train | 0.5494 | 0.7926 |
 
 **Held-out loss per subject:**
 
 | Subject | nats/char | bits/byte |
 |---|---|---|
-| `chess` | 0.381 | 0.550 |
-| `stories` | 0.457 | 0.659 |
-| `chat` | 0.493 | 0.711 |
-| `code` | 0.497 | 0.717 |
-| `reasoning` | 0.548 | 0.791 |
-| `arithmetic` | 0.610 | 0.880 |
-| `chat_hermes` | 0.791 | 1.141 |
-| `wikipedia` | 0.919 | 1.326 |
+| `chess` | 0.376 | 0.542 |
+| `stories` | 0.447 | 0.645 |
+| `chat` | 0.471 | 0.680 |
+| `code` | 0.472 | 0.681 |
+| `reasoning` | 0.526 | 0.759 |
+| `arithmetic` | 0.611 | 0.881 |
+| `chat_hermes` | 0.759 | 1.095 |
+| `wikipedia` | 0.873 | 1.259 |
 <!-- /auto:benchmarks -->
 
 ### enwik9 against published models
@@ -541,16 +496,16 @@ mini-AGI's two rows are measured here:
 
 Everything purple on this chart is **bits-per-byte on the PG19 test split** - one held-out set, so it compares directly: the diamonds are this model, the hollow circles the published byte-level models in the PG19 table above. This model scores **1.995 BPB** over the whole split (100 books, 41,289,001 bytes) at a context of 4,096, against its own mixture's 0.85. PG19 is out of distribution for it: it was trained on a corpus assembled for this project and has read no Victorian novels, so much of that gap is subject matter rather than capability.
 
-The green squares are this model on **enwik9**, the set the enwik9 table above compares it with published models on: Wikipedia, which it trains on, though never on these pages. It scores **1.328 BPB** there after 2.32B characters. A square is drawn only once it stands clear of the one before it, so the 7 measured since are not drawn yet; the latest is 1.288 after 2.80B characters. The dotted line carries it on to one pass of the corpus at the rate this model's Wikipedia held-out fell at over its last billion characters (α 0.089), where it reaches **1.19** - an assumption until enwik9's own measurements are 25% apart in what the model has read; its 8 so far are 20.7% apart. The hollow green circle far to the right is Llama-3.2-1B, the only model in that table whose training data is published: 0.68 after about 36 TB - about 16,000 times what this model has read, scored on 2,048 tokens, about 8 KB, at a time. The rest are not drawn, because how much they read was never published.
+The green squares are this model on **enwik9**, the set the enwik9 table above compares it with published models on: Wikipedia, which it trains on, though never on these pages. It scores **1.328 BPB** there after 2.32B characters. A square is drawn only once it stands clear of the one before it, so the 7 measured since are not drawn yet; the latest is 1.288 after 2.80B characters. The dotted line carries it on to one pass of the corpus at the rate this model's Wikipedia held-out fell at over its last billion characters (α 0.179), where it reaches **1.06** - an assumption until enwik9's own measurements are 25% apart in what the model has read; its 8 so far are 20.7% apart. The hollow green circle far to the right is Llama-3.2-1B, the only model in that table whose training data is published: 0.68 after about 36 TB - about 16,000 times what this model has read, scored on 2,048 tokens, about 8 KB, at a time. The rest are not drawn, because how much they read was never published.
 
-The red line is the fitted power law on this model's own held-out, `L ∝ D^-0.195` with R² 0.96 over every point past the warmup - between Kaplan's 0.095 and Chinchilla's 0.28, and it has held for more than a decade of data. How steep it looks depends on where the fit starts, and the band on the chart spans that range.
+The red line is the fitted power law on this model's own held-out, `L ∝ D^-0.182` with R² 0.96 over every point past the warmup - between Kaplan's 0.095 and Chinchilla's 0.28, and it has held for more than a decade of data. How steep it looks depends on where the fit starts, and the band on the chart spans that range.
 
-Read straight off that trend, on this model's own mixture. It has read 2.80B characters so far, in about 29 days of running. The days below assume the pace of the last 21 hours of it: 1,643 characters a second on the wall clock, held-out checks and rounds of samples included, because the reading waits for them.
+Read straight off that trend, on this model's own mixture. It has read 3.90B characters so far, in about 37 days of running. The days below assume the pace of the last 17 hours of it: 1,585 characters a second on the wall clock, held-out checks and rounds of samples included, because the reading waits for them.
 
-| held-out | total data read | further reading | days from here at ~1,643 char/s |
+| held-out | total data read | further reading | days from here at ~1,585 char/s |
 |---|---|---|---|
-| 0.80 BPB | 3.75B | +0.95B | ~7 |
-| **0.69 BPB** | 8.04B | +5.24B | **~37** |
+| 0.80 BPB | 4.40B | +0.50B | ~4 |
+| **0.72 BPB** | 8.04B | +4.13B | **~30** |
 
 The first one is days of reading on one laptop GPU, and it sits inside a single pass of the 8.04B-character corpus.
 
@@ -644,7 +599,7 @@ A fresh model starts small and grows into its shape. The context window begins a
 
 This means the first hours of a run look nothing like the rest of it. Loss falls fast, the pool churns, the window is short, and the learning-rate controller has not gathered enough evaluations to act. None of that is a problem to fix.
 
-If a run diverges, it repairs itself: when held-out exceeds the best by more than `--revert-factor` (default 1.5x) the run reloads `weights/`, halves the learning rate, pulls the context back and continues. After `--max-reverts` it stops rather than thrash.
+Nothing rolls back on its own. A run saves to `weights/` every five minutes, at every held-out check and when it stops, so even a crash costs at most a few minutes of reading. To keep an earlier state, copy the directory.
 
 ## Layout
 
@@ -660,9 +615,13 @@ minagi/          the model. no command lines here.
   paged.py         the same pool spread over disk, RAM and VRAM
   recur.py         latent recurrence with adaptive depth
   stream.py        reading a corpus behind a KV cache, one chunk at a time
+  lanes.py         how the reading is shared between subjects
   store.py         the weights directory, which IS the model
   optim.py         how much of a gradient is signal
+  muon.py          the optimiser: Muon for weight matrices, AdamW for the rest
   plasticity.py    the learning rate, governed by held-out loss
+  governor.py      the same controller, wherever the model learns
+  heldout.py       the level a held-out check reports at
   live.py          serving a model that is being trained underneath
   report.py        the model reading statistics off its own weights
   create.py        writing a fresh weights directory from config.yaml
@@ -671,11 +630,18 @@ train.py         read | stream | ponder-probe
 serve.py         local web UI
 config.yaml      the settings worth changing
 corpora/         python3 -m corpora all - the whole corpus, downloaded and made
+memory/          the project's history, kept for agents
 weights/         one file per expert. this directory is the model.
 ```
 
 `weights/` is written on the first run and `data/` by `corpora`; neither is in
 the repository. Everything else above is.
+
+`memory/` is the project's history: every change, the tests that were run and what
+they found, what worked and what did not, and the corrections made to how the run
+was measured while it trained. It is kept mostly to preserve that history, for an
+agent picking the project up at any point, so it is written for an agent to read
+rather than for a person.
 
 ### The weights directory is the model
 
@@ -684,12 +650,12 @@ weights/
   manifest.json     what exists, its shape, and where it came from
   core.npz          embeddings, attention, norms, adapter, halting head
   routers.npz       the gate, and the router: one row per expert per site
-  optim.npz         Adam moments for the trunk and the routers
-  experts/          one file per expert: w1, w3, w2 and its own Adam moments
+  optim.npz         the optimiser's state for the trunk and the routers
+  experts/          one file per expert: w1, w3, w2 and its own optimiser state
     e00000.npz ...
 ```
 
-Training resumes from it - weights, Adam moments and step count - and advances it whenever a run improves on what is there, so a session run only to check something still contributes if it finds anything. The directory holds the **best** state the model has reached, not the most recent one. Writes are atomic: every file is written to a `.tmp` and renamed, so an interrupted save cannot leave a half-written weight behind.
+Training resumes from it - weights, optimiser state and step count - and saves into it every five minutes and at every held-out check, so the directory is the model as it last stood. Writes are atomic: every file is written to a `.tmp` and renamed, so an interrupted save cannot leave a half-written weight behind.
 
 The directory is written on the first run.
 
@@ -707,7 +673,7 @@ Byte level - vocabulary 265: the 256 byte values plus 9 structural markers (`<th
 | paging | 32 experts resident on the card; the rest live on disk |
 
 <!-- auto:params -->
-The parameter count moves, because the pool grows and prunes itself while training. `python3 -m minagi.store weights` prints what it is now. At step 1,368,001:
+The parameter count moves, because the pool grows and prunes itself while training. `python3 -m minagi.store weights` prints what it is now. At step 1,906,458:
 
 ```
 core        8.27M  embeddings, attention, norms, adapter, halting head
@@ -723,6 +689,12 @@ total    1257.3M
 ## AI usage
 
 This project was assisted by "Claude Opus" 5 and 5.5 models. The model did implemented most of code of this project, verified and debugged it when it was necessary. The model was searching for published papers related to the problems that the project were trying to solve, build tests and experiments, and help with brainstorming the complex problems that arose along the way. The animations, graphs and other media you see here are all done by Claude as well form the real data traces. While I myself provided main ideas, steering, intuition, rejections when thing went in a wrong direction, code monitoring and verification, as well as decisions and strong opinions of how everything should be wired together and work in principle. Documentation was written in tandem.  
+
+## Contributions
+
+Everyone is welcome to contribute to this project in whatever way suits them, with or without AI. I only ask that you show you care about what you contribute enough by writing the PR description yourself first, in your own words, and only then add AI-written technical details if they are needed. I want to see your intent and what you are trying to achieve. As the maintainer, I reserve the right to decline a contribution, including when I cannot understand what you are trying to do or I do not think the contribution fits the project. Obviously, ill intended PRs are going to be refused as well. For anything large, please open a discussion first, so we can agree on the direction before you put the work in. Big PRs without a clear justifications for a large changes are going to be refused as well. 
+
+You are always welcome to fork the project, and that may even be the better way to adapt it to your own needs. I keep an eye on active forks, and when one has an idea worth borrowing, this project may adopt it, with credit, even without a direct merge, creating some sort of soft cross-pollination.
 
 ## Acknowledgments
 
@@ -750,7 +722,7 @@ The parts the model is built out of:
 [An Empirical Model of Large-Batch Training](https://arxiv.org/abs/1812.06162) - McCandlish et al., 2018. The gradient noise scale.  
 [The AdEMAMix Optimizer](https://arxiv.org/abs/2409.03137) - Pagliardini et al., 2024. Tried as the trunk's optimiser; at the paper's settings AdamW did better here, so it was removed.  
 [A Contrastive Framework for Neural Text Generation](https://arxiv.org/abs/2202.06417) — Su et al., 2022. Contrastive search, implemented as an alternative decoder. The default path does not use it, but the idea that degeneration is a property of the decoding rule rather than of the weights is what led to the adaptation trace that replaced it.  
-[Muon](https://kellerjordan.github.io/posts/muon/) — Keller Jordan, 2024. Orthogonalised momentum. Not implemented, but it is the reason the trunk's optimiser is treated as a separate question from the pool's at all.  
+[Muon](https://kellerjordan.github.io/posts/muon/) — Keller Jordan, 2024. Orthogonalised momentum. The run's optimiser for every weight matrix since 3.19B characters, applied as in [Muon is Scalable for LLM Training](https://arxiv.org/abs/2502.16982) (Liu et al., 2025): from the same weights and 30M characters of the same text, it ended 0.0039 nats lower on held-out than AdamW.  
 
 [TinyLlama: An Open-Source Small Language Model](https://arxiv.org/abs/2401.02385) — Zhang et al., 2024. 1.1B parameters on three trillion tokens, sixteen A100s for ninety days. The closest published analogue to a small team training a small model from scratch.  
 [MEGABYTE: Predicting Million-byte Sequences with Multiscale Transformers](https://arxiv.org/abs/2305.07185) — Yu et al., 2023. 1.000 bits per byte on PG19 after reading 80 billion bytes, and one of the published byte-level points on the scaling chart.  

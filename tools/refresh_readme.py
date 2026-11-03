@@ -11,15 +11,14 @@ the two collapsible blocks from the sample log and the progress graph, and
 the parameter count from the weights themselves.
 
 Everything between a pair of markers is replaced; everything else in the
-README is left exactly as written. The markers stay in the published copy,
-which costs nothing - they are HTML comments - and means the next refresh
-can find its own regions in a tree that has been edited by hand.
+README is left exactly as written. The markers stay in the README, which
+costs nothing - they are HTML comments - and means the next refresh can
+find its own regions in a file that has been edited by hand.
 
     <!-- auto:NAME -->   ...generated...   <!-- /auto:NAME -->
 
-Run by publish.sh before it copies, so what ships is current by
-construction. Lives in tools/ and is not published: the public tree gets
-the result, not the machinery.
+Run by release.sh before a push, and by measure_benchmarks.sh after it
+measures, so what is pushed is current by construction.
 """
 import json
 import os
@@ -177,8 +176,8 @@ def checks():
     was neither measurement and is left out: only a check writes the rate
     controller's evidence line. After the change that evaluation is the level
     itself, and counts. Everything before held-out counted whole blocks only
-    moves again, by what the session that switched measured. The README's
-    in-flight corrections section says all this in words.
+    moves again, by what the session that switched measured.
+    memory/corrections.md says all this in words, with the numbers.
     """
     if ROOT not in sys.path:
         sys.path.insert(0, ROOT)
@@ -1139,14 +1138,14 @@ def main():
         f"*Every sample round of the run to date: {latest['chars']:,.1f}M "
         f"characters over {len(scored):,} evaluations"
         + ("; held-out from before the [in-flight corrections]"
-           "(#in-flight-corrections) is drawn moved onto today's level"
+           "(memory/corrections.md) is drawn moved onto today's level"
            if any(d.get("shifted") for _, _, d in scored) else "")
         + ".*\n\n</details>\n\n"
         "<details>\n<summary><b>Current quality of samples the model "
         "generates</b></summary>\n\n"
         f"*The round with the lowest held-out loss so far - "
         f"{best['val']:.4f} nats at {best['chars']:,.1f}M characters"
-        + (" (from before an [in-flight correction](#in-flight-corrections) "
+        + (" (from before an [in-flight correction](memory/corrections.md) "
            "to how held-out is read, moved onto today's level; its header "
            "below is as it was written)" if best.get("shifted") else "")
         + ". "

@@ -139,49 +139,10 @@ def main():
     # ----------------------------------- 3. what the rate controller thinks
     ax = fig.add_subplot(gs[0, 2])
     lr = col("lr")
-    # Under the newborn rule every expert has a rate of its own: a thin line
-    # for each (expert_rates.jsonl, beside the sample log). The thick line is
-    # the main rate the controller sets - the one every expert comes down to,
-    # and the trunk's, times its multiplier. Not an average of the experts:
-    # six newborns at 25x the main rate put the mean of 303 at 1.5x it, a
-    # staircase rising with every birth while the controller was easing.
-    er = []
-    try:
-        with open(os.path.join(os.path.dirname(a.log) or ".",
-                               "expert_rates.jsonl")) as f:
-            er = [json.loads(ln) for ln in f if ln.strip()]
-    except (OSError, ValueError):
-        er = []
-    er = [e for e in er if e["chars"] / 1e6 >= x.min()]
-    start = er[0]["chars"] / 1e6 if er else np.inf
+    # the rate the controller sets: every expert's, and the trunk's times its
+    # multiplier
     for g in segs:
-        m = x[g] <= start
-        ax.plot(x[g][m], lr[g][m], lw=1.8, color=VAL)
-    if er:
-        ex = np.array([e["chars"] / 1e6 for e in er])
-        lines = {}
-        for xe, e in zip(ex, er):
-            for u, r in zip(e["uid"], e["rate"]):
-                lines.setdefault(u, ([], []))
-                lines[u][0].append(xe)
-                lines[u][1].append(r * e["lr"])
-        main = np.array([e["main"] * e["lr"] for e in er])
-        for xs, ys in lines.values():
-            ax.plot(xs, ys, lw=0.6, color=VAL, alpha=0.35)
-        before = x <= start                  # join it to the log's own line
-        jx = ([x[before][-1]] if before.any() else []) + list(ex)
-        jy = ([lr[before][-1]] if before.any() else []) + list(main)
-        ax.plot(jx, jy, lw=1.8, color=VAL)
-        last = er[-1]
-        fast = [(u, r) for u, r in zip(last["uid"], last["rate"])
-                if r > last["main"] * 1.01]
-        if fast:
-            # labelled where the first of them starts, clear of the
-            # controller's labels at the right-hand edge
-            x0 = min(lines[u][0][0] for u, _ in fast)
-            ax.text(x0, max(r for _, r in fast) * last["lr"],
-                    f"{len(fast)} newborn{'s' if len(fast) > 1 else ''} ",
-                    fontsize=7, color=VAL, ha="right", va="center")
+        ax.plot(x[g], lr[g], lw=1.8, color=VAL)
     ax.set_ylabel("lr", color=VAL, fontsize=8.5)
     ax.set_yscale("log")
     q = ax.twinx()
@@ -193,7 +154,7 @@ def main():
     # wrote on 10 October carry its improvement in sd here instead)
     at = 2.2
     q.axhline(at, color="#9467bd", ls="--", lw=.9, alpha=.7)
-    # at the left: newborns appear at the newest, right-hand end
+    # at the left, clear of the newest readings at the right-hand end
     q.text(x.min(), at, " raises above here", fontsize=7, color="#9467bd",
            ha="left", va="bottom")
     q.set_ylabel("evidence t", color="#9467bd", fontsize=8)

@@ -18,8 +18,8 @@ same evaluation on the weights it leaves behind - that measurement is used
 and the card is not touched.
 
 It needs the card and the weights to itself, so it will not run beside a
-training run - and publish.sh will not publish without it: it refuses to
-start while a run is training (--check) and stops if this fails.
+training run - and release.sh will not refresh the README without it: it
+refuses to start while a run is training (--check) and stops if this fails.
 
     python3 tools/measure_heldout.py
     python3 tools/measure_heldout.py --all

@@ -1,0 +1,309 @@
+# experiments
+
+Registry of tests, probes and A/Bs: setup, numbers, verdict. Oldest first. "held-out" is nats/char on
+`data/val` unless said; lower is better; "arm - control" negative is better. Raw results live in `runs/`
+(not tracked, so only on the machine that made them) where a path is given. Before re-running anything here, read its verdict; the
+noise rules are in conventions.md "Measuring and reporting".
+
+## Measurement instruments
+
+**E1 evaluator noise (2026-09-03).** Repeated draws on fixed weights: 6 chunks 12,288 chars sd
+0.0275; 24 chunks sd 0.0170; 96 sd 0.0093; 240 sd 0.0064. The sample is the window, not the chunk (chunks
+correlate; per-chunk spread overstates the error ~2.5x). Same recipe run twice: 0.6594 vs 0.6735 (CUDA
+dispatch nondeterminism). Verdict: stderr shown with every loss; ~0.03 threshold between separate runs.
+Details findings.md section 2.
+
+**E2 held-out read from the top vs spread (2026-10-17).** 30 blocks spread over each subject vs the first
+30,720 chars: per-subject offsets -0.115 (chat_hermes) .. +0.094 (stories), all 8 -0.011. Verdict: spread
+blocks; history moved (corrections.md item 1).
+
+**E3 leftover part-blocks (2026-10-18).** Short leftovers (73, 68, 32 chars) were 21% of chat_hermes's
+check, which read ~1.0 against 0.74 with noise 0.025/check (0.002 before). Whole blocks only; offsets
+chat_hermes +0.086, wikipedia -0.040 (mostly re-sampling: 12 of its 30 picks moved), all 8 +0.004.
+Verdict: whole blocks; history moved (corrections.md item 2). A subject's 30-block figure is good to a few
+hundredths.
+
+**E4 paired A/B noise floor (2026-10-26, tools/ab_pool.py).** Control run twice, 12M chars each on copies,
+identical text, checks off, 960 held-out blocks: held-out +/-0.0005, paired training loss +/-0.00003.
+
+## Architecture and training
+
+**E5 KV-cache mask (2026-09-02).** is_causal top-left with a cache: chunked loss 4.0326, max logit diff
+34.85 vs a full pass; lower-right mask: 1.2022, 0.177. findings.md section 6.
+
+**E6 sliding the KV cache (early Sept).** Reading past the window by sliding while holding the position
+offset: 2.60 vs 0.68 within the window (RoPE distances mismatch). Readers start a new window instead.
+findings.md section 3.
+
+**E7 gradient accumulation (early Sept).** 3.0M chars fixed: accum 1 0.6594 +/-0.0093, 8 0.6615, 64 0.6701.
+Nothing; flag kept at 1. findings.md section 4.
+
+**E8 context beyond trained length (Sept, old weights).** Same weights: 4,096 1.158; 8,192 1.384; 16,384
+1.879; 32,768 2.091. Hence the window grows gradually (`ramp_context`, then earned growth). A ramp
+to 8,192 once diverged (0.6524 -> 5.4490).
+
+**E9 where forgetting lives (2026-09-18).** Four corpora read in sequence. Pool alone -12.5%
+spread; freezing the trunk removes 99.7% of forgetting; trunk LR sweep x1 3.519/2.331 (mean/spread), x0.3
+3.475/1.307, **x0.1 3.370/0.878**, x0.03 4.004/0.723, frozen 4.922/0.559. On mixed batches x0.3 also helps
+(2.472 -> 2.380 mean). Verdict: trunk at x0.1 of the experts' rate (`training.trunk_lr_mult`). findings.md 5.
+
+**E10 continual-learning replication (2026-09-23..24, replication/).** 428.2M-char weights, 174 experts.
+PG19 read massed, 1,048,576 chars at the operating LR, batch 1:
+
+| arm | PG19 | the 8 known | learned per nat forgotten | retained |
+|---|---|---|---|---|
+| experts frozen, trunk LR = expert LR | -0.2909 | +1.2663 | 0.23 | 74.12% |
+| swapping, trunk LR = expert LR | -0.3106 | +1.2628 | 0.25 | 74.25% |
+| swapping, trunk x0.1 (the run) | -0.4216 | +0.1297 | 3.25 | 97.30% |
+| interleaved as a 9th lane | -0.3124 | -0.0065 | nothing forgotten | 100.13% |
+
+Over the massed read only 44 of 174 experts received gradient. Freezing experts changed forgetting by
+0.0035. Measured before the current selection rule (experts re-chosen per chunk then). Weights:
+huggingface.co/Volotat/mini-AGI-cl-replication-weights.
+
+**E11 freeze-and-carry (2026-09-28).** Halted characters stop being computed: ~0.001 loss
+cost, +15% training speed, -1.8 GB VRAM, +60% writing speed. On.
+
+**E12 halted characters already cheap (2026-10-05, weights_0.6695_bkp).** Characters still computed per row
+(2048-char chunk): arithmetic 2048, 2048, 2047, 2040, 2030, 1993, 1948, 1890, 1798, 1637, 1316, 629, 140, 19,
+5, 3; chess 2048 x6, then 1966 at row 10, 1110, 534, 237, 86, 33, 10, 1. Halted character-rows 15-25% of a
+step; skipping their attention would save ~2-4%. Dropped.
+
+**E13 fp16 (2026-10-05).** Recurrent state h peaks ~9,920 on arithmetic text (line starts after
+"</think> N"), 664 on chess, <100 elsewhere; RMSNorm squares reach 98.5M; 3.7M values over fp16's 65,504.
+fp16 + GradScaler for AMD RDNA2 dropped.
+
+**E14 depth by character class (2026-09-19).** Mean rows: space 7.00, first letter of a word 7.65, inside a
+word 8.90, punctuation 10.12.
+
+**E15 latent carry between chunks (2026-09-26).** One 512-vector (the last latent) added at step 0 of the
+recurrence at every position of the next chunk (~6x a character embedding), meant to travel across restarts
+too. On the trained checkpoint, ungated: +0.24 nats, paired gap narrowing +0.56 -> +0.10. From one fresh
+initialisation, 8M chars each (held-out / final-quarter train): control 2.3206 / 1.9868; ungated carry
+3.5921 / 3.5453, gap widening +1.07 -> +1.56 by quarter, better on 3% of 3,912 chunks; gated (alpha * carry,
+alpha learned from 0, trunk rate): alpha stayed within +/-0.001 (a consistent gradient could have reached
+0.117), train 2.0006, i.e. the control within run-to-run noise. Reading: a vector broadcast to every
+position is a position-independent bias that changes every chunk; attention cannot use it, so forced in it
+costs capacity and offered it is declined. Not tested (structurally different): position-aligned carry
+(last N latents seed the first N positions), memory as extra positions attention reads (RMT /
+Block-Recurrent Transformer style), a learned projection, other injection points. All code reverted at the
+author's call, back to the state before the experiment; per-chunk loss logs were kept only in that
+session's scratch. Relevant to the next stage's latent state (state.md).
+
+**E15b context cost (2026-09-26).** The KV cache holds 26 slots per character (every block-application):
+26 x K,V x 512 x 2 bytes = 52 KB a character; 4,096 -> 0.22 GB, 8,192 -> 0.44 GB, 16,384 -> 0.87 GB.
+Sparse long-range attention (NSA, Compressive Transformer, LongNet) cuts what is read, not what is stored;
+memory for a long window is the cache plus dispatch buffers (x24 rows), which dominate.
+
+**E16 gate vs use (2026-10-05).** Spearman |gate| vs routing use +0.86 (contradicted a README claim).
+
+## Expert selection
+
+**E17 single rule (2026-09-27, step 295,101).** Router admits what each text asks for vs the old
+working-set rule, 15 min each: held-out 0.7170 -> 0.7036 zero-shot, 0.7111 -> 0.7011 after 15 min; reading
+1,695 -> 1,802 char/s (+6.3%); loads/step 6.39 -> 2.43; VRAM same.
+
+**E18 exploration bonus (2026-09-27).** beta 0.35 vs 0, 15 min: 128 vs 92 experts reached the card, young
+39 vs 22, loads/step 3.67 vs 2.56, speed -5%, held-out +0.0007 vs +0.0013 (stderr 0.015). Adopted, later
+replaced (E21).
+
+**E19 per-character vs text vote while writing (2026-09-28).** Writing loss on the same held-out text: 1.3490
+per-character admission vs 1.1111 with the text's vote. Per-character admission garbled words.
+
+**E20 selection temperature (2026-10-02, 15 min from step 478,910).** Held-out (own rule / top-8-scored),
+speed, loads/step, experts carrying 99%:
+- A top-8 + bonus 0.65: 0.6538, 1,968 c/s, 3.9, 89
+- D top-8, no bonus: 0.6547, 2,034 c/s, 2.4, 53
+- F T=1: 0.9264, 1,031 c/s, 25, 115 - writing garbled, 3.0 c/s
+- G T=0.5: 0.8329, 1,186 c/s
+- H T=0.2: 0.7124 / 0.6656, 1,371 c/s, 16.3, 104 - writing repeats 30.9%, non-words 10.1%
+Sampling experts did not reduce repetition. Temperature stays 0.
+
+**E21 bonus vs balance vs per-expert offsets (2026-10-02/03, 15 min from 478,910).** Held-out, experts admitted
+across held-out (59 at start): bonus 0.65 0.6541, 58; balance 0.01 0.6793, 114; DeepSeek-style offset 0.001
+0.7019; offset 0.0002 0.6518, 73. The author chose the balance term (0.003 committed; later lowered by hand in
+steps to 1e-5, timeline.md).
+
+**E22 generation per-character loads (2026-09-27, step 298,919).** Writing admits per character: ~19.6
+loads/char (9-30), 0 writes. Reply speed 188 ms/char warm RAM without an optimiser, 308 ms with learning on;
+the old per-text rule 92 ms. Author accepted slower generation for freedom (writing later used
+the text's vote too).
+
+**E23 late-born experts (2026-09-21).** Routing received by experts born late vs originals: 3.4x less.
+
+**E24 auditions (2026-09-26).** v1 (stalest + last_try) leaked: a kept incumbent reset its prune clock, 0
+dying. v2 (best undiscounted fit among the suppressed, one chunk, no clock reset) worked but the whole
+mechanism was replaced by E17 the next day.
+
+## Paging and speed
+
+**E25 RAM tier (2026-10-07, 360 experts, 10-min isolated runs).** 96 -> 200 experts: hit 0.63 -> 0.78,
+reading ~1,280 -> ~1,560 char/s, whole session 792 -> 1,125 (+42%). Write-behind + lazy moments: no gain
+(792 vs 823 at 96), dropped. Direct `.npz` reader: reads 3.6x faster, disk-read share 20% -> 6%,
+end-to-end within noise (committed). RSS ~2 GB + ~47 MB/tier expert + 1.4 GB training. One 8-min run
+carries +/-5-8% noise.
+
+**E26 moments bf16 in RAM (2026-10-18, 350 experts, 9-min arms).** py-spy: paging 28.5% of the main thread
+(eviction writes 13.5%, card->RAM copies 8.8%, disk reads 3.9%, moments to card 3.9%). bf16 moments in RAM
+(~25 MB/expert vs 38): same RAM 288 vs 192 entries, hit 0.72 -> 0.87, reading 1,468 -> 1,901 char/s (+29%).
+GPU kernel time ~0.9 s/step: matmuls 43%, add_ 13%, casts ~8%, pageable memcpys ~11%, AdamW 6%. ~9.6 of 32
+slots swapped per chunk. Sample rounds write ~30 char/s (~11% of wall time at a 10-min cadence).
+
+**E27 CPU and AMD (2026-10-04..07).** A laptop CPU alone, throttled: reading 25 c/s, writing 3.4 c/s, RSS
+13.4 GB. Writing x1.57 on CPU after casting weights once and running only used experts. RX 6800 XT fp32
+reading 1,242 -> 1,388 char/s after exact dispatch + blocked attention's own backward; bf16 there is 4.6x
+slower than fp32. README "GPU support" table holds the measured rows.
+
+**E28 capacity factor (2026-10-10).** The dispatch cap dropped ~7% of assignments; the author set
+`capacity_factor: 0` (no cap).
+
+## Learning rate
+
+**E29 paired anneal probe (2026-10-10).** Same text, rate x0.02 vs x0.058: x0.02 better at every check and in
+all 8 subjects; full held-out 0.6123 vs 0.6191. The upward-probing rule had raised x0.058 ->
+x0.067 while held-out went 0.6255 -> 0.6290. Verdict: the 19 September controller with guards, gentle.
+
+**E30 LR A/B (2026-10-18, step 1,137,561, 2,329M chars, controller at x0.032).** Four arms, same 3M chars,
+checks off, saved, 60 spread blocks/subject:
+
+| base lr | held-out change | subjects better | online train loss |
+|---|---|---|---|
+| 9e-4 (x3) | +0.0141 | 0/8 | 0.4996 |
+| 3e-4 (x1) | -0.0010 | 4/8 | 0.4903 |
+| 1e-4 (x1/3) | -0.0033 | 8/8 | 0.4902 |
+| 3e-5 (x1/10) | -0.0026 | 8/8 | 0.4910 |
+
+x1/3 best; a 3M test is mostly an annealing drop. Recommended `--lr 1e-4`; the controller reached lower on
+its own (x0.014 by 10-26, x0.0133 on 10-28).
+
+**E31 newborn learning rate (2026-10-16).** Rule on vs off, 2 x 20M chars: full evaluation 0.5974 -> 0.5982
+(neutral). Adopted, then removed 10-27 (E35 showed no effect).
+
+## Pool composition
+
+**E32 expert masking (2026-10-10).** Masking young experts hurts (they carry knowledge); 88 idle experts
+(gate < 0.03, all past trial); growth blocked at the 10 GB disk cap (397 experts).
+
+**E33 pruning capacity (2026-10-16).** Removing the bottom-|gate| experts, nothing trained: 50 -0.0002, 100
+-0.0003, 150 +0.0002, 200 +0.0105 (chess +0.045, stories +0.039), 250 +0.0144, 300 +0.0397. ~150 of 397
+removable. The author postponed pruning (decisions.md).
+
+**E34 usage anatomy (2026-10-26).** The usage cliff at ~30 experts is the 31 originals (median gate ~1.21) vs
+366 grown (median 0.037). Originals' share of routing 44% at 2.0B chars -> 54% at 3.1B. Untouched weights at
+0.5719: 394 chosen on held-out, top-31 share 0.559, n90 183, n99 332, effective number 140.5. Grown experts
+get ~46% of picks; 52 gates above 0.1.
+
+**E35 pool A/B rounds 1-2 (2026-10-26/27, tools/ab_pool.py, runs/ab_pool/).** Arms minus control:
+- `pool.route_bias` 1e-3 (target 1/(rank+25), centered sign step): +0.31 train and held-out (0.8836);
+  usage forced flat (effective 384) onto weak grown experts that dilute the originals. Usage follows
+  usefulness and cannot be imposed.
+- `pool.gate_after` plain: probe +0.152 +/-0.008 (nothing trained); "scaled" variant: probe +0.058, after 12M
+  +0.008, stalled ~+0.007, usage narrower.
+- `training.newborn_lr` off: -0.0004 +/-0.0003 (no effect).
+- **Muon** (minagi/muon.py, every matrix incl. the router): 12M: -0.0028 +/-0.0003, better in all 8
+  subjects, reading -6.4%. 30M: -0.0039 +/-0.0004; Muon improved 0.0024 from the start while AdamW drifted
+  0.0015 worse (chat, stories, chess); training gap per 5M chars -0.0002, -0.0008, -0.0014, -0.0017,
+  -0.0016, -0.0021 (still widening); reading -8.5%; usage narrower (n90 146 vs 186; 374 vs 395 used on
+  held-out). Adopted 10-27.
+- Not tested: `growth.birth_gate_parents` (the pool is at its ceiling; needs forced births on a copy).
+- Proposed, not run: the rate under Muon (x0.04 vs x0.014, 30M chars).
+
+## Corpus and data
+
+**E36 contamination (2026-09-18).** 0 exact hash overlap of 548 val vs 535,596 train files; 64-gram overlap
+0.03-2.8%. Held-out set: 240 chunks/subject cap, ~3.9M chars total then.
+
+**E37 chat_hermes leakage (2026-10-18).** ~9% of chat_hermes held-out answers appear verbatim in
+`data/train/chat/hermes`; other subjects' span overlaps are generic phrasing (chat 35/150 spans, stories
+18/150, code 9/23, reasoning 4/150, wikipedia 1/150). Dedup deferred.
+
+**E38 issue #30 (2026-10-12).** 1,663 files of this corpus were skipped as binary because a 4,096-byte sample
+cut a UTF-8 character; the code lane had lost 31% to NUL separators. After the fix 0 regressions; corpus
+7,880M -> 8,037M chars.
+
+**E39 arithmetic floor (2026-10-28).** The generator's randomness (operands, digit counts, task, notes) sets
+an exact minimum: -log P(line) / tokens = 0.5919 nats/token over val, 0.5931 over train; 0.594-0.597 on the
+30 start-evaluation blocks, 0.614-0.615 on the 8 check blocks; both leave the same ~0.014-0.015 gap. All
+4,000,000 train and 20,000 val lines are exactly what the generator writes. Learnable part (moved history
+minus 0.596): 0.149 in the first 250M, 0.025 at 600M, 0.017 at 1.5B, ~0.015 at 2.3B, 0.0141 at 3.3B. The lane
+sits at the 1/32 floor since ~2.39B (smallest worth; 1/32 of visits, ~7% of characters, E47). The floor adds a
+constant 0.0745 to the 8-subject average, so alpha fitted on the total understates the learnable exponent by >=
+15%. Method: parse each line, -log P with sum's digit cap and round's d=1/2 marginalised, tokens counted with
+ByteTokenizer (think markers are one token), block-start partial lines as a range.
+
+**E40 grad-norm spike (2026-10-28).** 9.25 at the check of step 1,612,069 (3,300.8M chars) vs ~2.6 normally
+(the only other check above 5: 5.02 at 810M); train loss 0.674 vs ~0.53 in the same 400-step window.
+Held-out +0.0019 (stories +0.010), back 5.6M chars later. Replay of the session's reading (each lane draws file
+then offset from `np.random.default_rng([shuffle_seed, lane index, read_chars at session start])`, offset only
+if the file's tokens > span+1, span 16 x 2048; interleaved by the schedule's round-robin at the manifest's
+shares - landed within 7 of 62,000 steps) named the most likely passage: a half-Japanese chat file
+(`chat/hermes/0039/part-079367.txt`, ~3,700 kanji). Harmless: every step is clipped (norm always > 1) and
+Muon normalises before orthogonalising. If spikes recur: skip steps far above the recent mean, or confirm a
+passage's loss on a copy.
+
+**E41 chess (2026-09-20).** Per-move legality p ~0.906, ~9.65 legal moves before an illegal one; Elo needs
+p > 0.983 for a 40-move game. Samples log legal moves; prompt fixed to the training distribution.
+
+## Benchmarks
+
+**E42 enwik9 (2026-10-17..23).** 2,000 pieces of 2,048 bytes from a 50 MB slice never trained on
+(`python3 -m corpora enwik9`): mini-AGI 1.3277 (2,319.6M chars), later 1.3091 (2,458M) and 1.29 (2.8B);
+GPT-2 XL 1.0730, Large 1.1189, Medium 1.17, Small 1.33 (measured here, same pieces). Dynamic evaluation
+1.3091 -> 1.2515 (-0.058 +/-0.0015, gain growing by quarter: +0.042, +0.060, +0.061, +0.068; 38 min; 3.6 GB
+VRAM). Whole pages in the 4,096 window ("natural"): 1.19 frozen-in-window, learning's own share 0.024; GPT-2
+Small/Medium on pages 1.314/1.144 (left out of the README). Best effort over all 17,426 pages: 1.14 (2.8B).
+
+**E43 PG19 (2026-09-22 .. 10-23).** Whole test split (100 books, 41,289,001 bytes), windows of 4,096 pooled
+by byte: 2.4496 (09-22), 2.091 (10-03, alpha_pg19 0.153), 1.995 (10-23); best effort (all books in order,
+learning) 1.447. Out of distribution: no PG19 or Victorian novels in the corpus.
+
+**E44 scaling fits.** L proportional to D^-alpha on the run's held-out: alpha 0.221 (R2 0.94) at 236M; 0.188
+(R2 0.96) over everything past warmup (README, 10-28); recent windows flatter: whole run 0.195, last 140M
+0.155, last 100M 0.095 (10-27). Wikipedia held-out over its last billion chars alpha 0.107 (enwik9 projection).
+
+**E46 GPT-2 catch-up forecast (2026-10-17).** At 2,319.6M chars enwik9 read 1.3277, level with GPT-2 Small (1.33,
+measured here on the same pieces). Forecast for the larger GPT-2s, with the Wikipedia held-out subject as the proxy
+(enwik9 assumed to move with it) and its local power-law slope, which kept flattening (0.156 over the run, 0.08 over
+the last 1B chars, 0.06 over the last 300M). At 0.08: Medium (1.17) at ~10.8B chars read, Large (1.12) at ~19.7B,
+XL (1.07) at ~33B, i.e. 1.3, 2.5 and 4.1 passes over the corpus; at the pace then (~100M chars a day) about January,
+April and August 2027. Since: 1.3091 at 2,458M and 1.29 at ~2.8B, where that slope gives 1.31, so the run is a
+little ahead of it; the pace is now ~134M a day. The README's chart carries enwik9 on at its own measured rate
+instead.
+
+## Next-stage corpus (2026-10-28)
+
+**E45 converters on real rows.** Each corpora/agent.py converter run on ~200 rows per dataset read from the
+Hugging Face dataset viewer (in memory, nothing saved): ~100% kept (2,789 of 2,790; the dropped Toucan row
+has a malformed call). Toucan's three big sets write calls as `function_call` + `function` results (a
+first converter would have lost every call); Nemotron-SFT writes grids with spaces. When2Call's SFT set has no
+calls by design (its calls are in the preference set). Generated tools lane: 5M chars in 19 s, every call
+replays identically.
+
+## Reading
+
+**E47 lane shares are shares of visits (2026-10-29, nothing run).** `minagi/lanes.py` `pick` pays one credit per
+visit, and a visit (`train.py` `_Lane.open`) draws a file uniformly, takes a random offset if the file is longer
+than the 32,768-character passage, else reads it whole. A lane's mean visit is the mean over its files of
+min(size, 32,768) (`runs/corpus_index.json`). Characters each lane read since the schedule began at 2,329.0M (the
+manifest's `lanes.read` minus the 291.1M each was seeded with), against the visit shares of 10-29 (shares moved
+over the period, so the ratios are approximate):
+
+| lane | share of visits | mean visit (chars) | share of chars since 2,329M | chars per visit share |
+|---|---|---|---|---|
+| wikipedia | 0.294 | 5,324 | 0.094 | x0.32 |
+| code | 0.188 | 9,692 | 0.123 | x0.65 |
+| chat | 0.186 | 16,827 | 0.262 | x1.41 |
+| reasoning | 0.119 | 18,185 | 0.155 | x1.30 |
+| stories | 0.091 | 16,565 | 0.129 | x1.42 |
+| chess | 0.060 | 32,754 | 0.138 | x2.30 |
+| arithmetic | 0.031 | 32,768 | 0.069 | x2.21 |
+| self-knowledge | 0.031 | 13,794 | 0.030 | x0.97 |
+
+Visit share x mean visit, normalised, matches the measured character shares to within ~0.03. So the rule values a
+character (|alpha| L / D) but allocates visits: lanes of long files get more characters than their worth asks for,
+lanes of short files fewer, and the floors and ceilings bind in visits (arithmetic's 1/32 is ~7% of characters).
+By the same arithmetic the equal turns before 2,329.0M gave characters as arithmetic 22.5%, chess 22.4%, reasoning
+12.5%, chat 11.5%, stories 11.4%, self-knowledge 9.5%, code 6.6%, wikipedia 3.6%, not the eighth each that the
+schedule's seed assumes (and that lanes.py's docstring says self-knowledge got). Within a lane a short file is read
+whole at every draw and a long one only a window, so coverage per byte favours short files. Nothing was changed:
+paying credit by characters read, or drawing files by size, changes the run's reading and is the author's call.

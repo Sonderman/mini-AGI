@@ -15,7 +15,7 @@ One figure, six questions:
 Reads the checkpoint and runs/expert_history.jsonl. No torch, no GPU - it is
 meant to run while training owns the card.
 
-    python3 tools/plot_experts.py --weights weights_rows --out runs/experts.png
+    python3 tools/plot_experts.py --weights weights --out runs/experts.png
 """
 import argparse
 import json
@@ -149,7 +149,7 @@ def dying(now, cfg_, mask_young=True):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--weights", default="weights_rows")
+    ap.add_argument("--weights", default="weights")
     ap.add_argument("--history", default="runs/expert_history.jsonl")
     ap.add_argument("--out", default="runs/experts.png")
     a = ap.parse_args()

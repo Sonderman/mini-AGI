@@ -97,7 +97,9 @@ def _median(v):
 
 
 class Plasticity:
-    FLOOR = 0.01        # the rate is never allowed to reach zero
+    FLOOR = 0.001       # the rate is never allowed to reach zero. Easing is
+                        # the resting posture, so on a long plateau this is
+                        # where the rate settles
     CEIL = 1.0
     LAM = 0.97          # decay per evaluation; n_eff -> (1+L)/(1-L) = 65.7
     LAM_FAST = 0.85     # the second, shorter fit; n_eff -> 12.3. Not lower:
@@ -189,6 +191,17 @@ class Plasticity:
 
     def tick(self):
         self.step += 1
+
+    @staticmethod
+    def shown(scale):
+        """A scale as the log and the notes print it: three significant
+        figures and never an exponent, so a rate below a hundredth reads as
+        itself (0.00951, not 0.010) and whatever reads the log's digits still
+        reads it."""
+        scale = float(scale)
+        if not scale > 0 or not math.isfinite(scale):
+            return f"{scale:.3f}"
+        return f"{scale:.{max(3, 2 - math.floor(math.log10(scale)))}f}"
 
     # ------------------------------------------------------------ evidence
     def _se(self):
@@ -380,7 +393,8 @@ class Plasticity:
                     self._accumulate(y)
                     return 1, (f"held-out moved to {y:.4f} from "
                                f"{h['from']:.4f} and stayed - new regime, "
-                               f"rate {before:.3f} -> {self.scale:.3f}"), True
+                               f"rate {self.shown(before)} -> "
+                               f"{self.shown(self.scale)}"), True
             else:
                 # Did the level move, or was it one bad reading? Whichever of
                 # the two this reading lands nearer to.
@@ -468,8 +482,8 @@ class Plasticity:
                         "deteriorating" if t < -self.T_MID else "settling")
                 notes.append(f"{kind}: t={t:+.2f} (effect {e:+.3f} per "
                              f"evaluation) over {n_eff:.0f} effective "
-                             f"evaluations, rate {before:.3f} -> "
-                             f"{self.scale:.3f}")
+                             f"evaluations, rate {self.shown(before)} -> "
+                             f"{self.shown(self.scale)}")
                 self.events.append({"at": self.step, "kind": kind,
                                     "val": val, "scale": self.scale,
                                     "t": round(t, 2)})
@@ -569,5 +583,5 @@ class Plasticity:
         head = (f"learning rate is governed by held-out, not by a horizon - "
                 f"eased at every check unless held-out is clearly improving, "
                 f"by at most {1 - math.exp(-self.NUDGE_DOWN):.1%} a check: "
-                f"rate x{self.scale:.3f}, floor x{self.FLOOR}")
+                f"rate x{self.shown(self.scale)}, floor x{self.FLOOR:g}")
         return head + (f", noise {s:.4f}" if s else "")

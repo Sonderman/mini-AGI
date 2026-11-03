@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # The long measurements behind the README's benchmarks, run apart from
-# publishing because together they take about a day of the card.
+# ./release.sh because together they take about a day of the card.
 #
 #   enwik9, frozen and with dynamic evaluation, on the 2,000 pieces of
 #     2,048 bytes ........................ tools/measure_enwik9_adapt.py    ~35 min
@@ -34,8 +34,8 @@
 # measurement that fails is reported and the rest still run.
 #
 # Then it redraws the scaling chart and refreshes the README from what it
-# measured. ./publish.sh copies the README and charts as they are, so run
-# this first when the numbers should move.
+# measured. ./release.sh refreshes the README too, but from the last of these
+# measurements, so run this first when the benchmark numbers should move.
 #
 #     ./measure_benchmarks.sh
 #

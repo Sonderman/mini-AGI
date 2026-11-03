@@ -1,8 +1,10 @@
 """Reading a corpus as fixed windows.
 
-The batch-shaped view of a corpus, used by the batch trainer and by the
-benchmarks. The streaming trainer uses stream.Reader instead, which walks a
-corpus in order behind a cache rather than drawing independent windows.
+Independent windows drawn at random, several per step. Training does not work
+this way any more - it walks a corpus in order behind a KV cache, one chunk at
+a time, which is minagi/stream.py. This is kept because the continual-learning
+experiments were measured with it, and an experiment that changes how it reads
+halfway through is not a comparison.
 """
 
 import json

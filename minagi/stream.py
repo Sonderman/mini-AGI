@@ -288,6 +288,9 @@ class FileReader:
             # are relative, so a character sliding from index 16,383 to 15,871
             # keeps every offset that matters.
             logits, loss = self.model(x, y, caches=None, pos_offset=0)
+        # the model's own loss, as held-out reads it - what is added below
+        # only steers the router
+        self.model_loss = loss.detach()
         if aux_weight and getattr(self.model, "pool", None) is not None:
             loss = loss + aux_weight * self.model.pool_aux()
         if hasattr(self.model, "pool_balance"):

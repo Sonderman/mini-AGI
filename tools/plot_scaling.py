@@ -625,8 +625,7 @@ def draw(D, Lb, T, rows, size=None, pgs=None, e9=None, END=7.874e9,
     for s in ("top", "right"):
         b.spines[s].set_visible(False)
 
-    for where in ("assets/scaling.png", "runs/scaling/scaling.png",
-                  "presentation/scaling.png"):
+    for where in ("assets/scaling.png", "runs/scaling/scaling.png"):
         path = os.path.join(ROOT, where)
         if os.path.isdir(os.path.dirname(path)):
             plt.savefig(path, dpi=130, facecolor="white")
