@@ -307,3 +307,380 @@ By the same arithmetic the equal turns before 2,329.0M gave characters as arithm
 schedule's seed assumes (and that lanes.py's docstring says self-knowledge got). Within a lane a short file is read
 whole at every draw and a long one only a window, so coverage per byte favours short files. Nothing was changed:
 paying credit by characters read, or drawing files by size, changes the run's reading and is the author's call.
+Changed 11-03 at the author's call: credit is paid by characters read (history.md). Estimated then over the last 500M
+characters (visit share x mean visit, as above): chess 16.4% of characters against a 7.0% share, arithmetic 7.4%
+against 3.1%, wikipedia 11.3% against 29.6%, code 11.3% against 16.2%. If each subject learned only from its own
+lane, reading by characters would have taken the 8-subject average from -0.0008 to -0.0012 a 100M characters - a
+bound, since what one subject teaches another is left out. Files are still drawn uniformly within a lane.
+
+## The weights themselves (2026-10-31 .. 11-03)
+
+**E48 issue #33: admission sees the whole forward (2026-10-31/11-01, partial).** On a copy of the weights at step
+1,773,530: a forward admits the experts its first pass asks for, tallied over all of its characters, so an
+earlier character's prediction can use experts a later character asked for. The same spread blocks scored the
+published way and causally (each position admitted from the characters up to it), causal minus published in
+nats/char: arithmetic +0.0049 +/-0.0005, chat +0.0113 +/-0.0020, chat_hermes +0.0111 +/-0.0013, chess +0.0037
++/-0.0006, code +0.0112 +/-0.0022 (23 blocks); 143 of 240 blocks, reasoning, stories, wikipedia and 7 code blocks
+not yet measured. Published twice: +/-0.0002. Nearly all of it is in each block's first 2,048 characters. A
+cheaper approximation overshoots by +0.0026 to +0.0103. Per block: published 0.33 s, the approximation 1.14 s,
+exactly causal ~11 s. Not a correction yet: the remaining blocks and the fix come first (corrections.md).
+
+**E49 what the weights hold (2026-11-03, step 1,983,054, 400 experts).** Read-only, on the CPU, after the
+"Weight-Space Programming" post (Takehi, Teoh, Zhang, Khattab, MIT CSAIL, 2026-11-02): weight-matrix products,
+decoding through the tied embedding, spectra; then forward probes on held-out text.
+- Embeddings: 153 of 265 byte vectors lie within cosine 0.9 of one direction - every non-ASCII and control
+  byte, and `~`; the 13 bytes UTF-8 never uses are identical, the CJK lead bytes E4-E9 0.997, the Cyrillic D0/D1
+  0.995, the continuation bytes 0.955 pairwise; norm against log frequency -0.91. The same at 2,329M (154). The
+  output side pushes every rarely-correct byte the same way, and with tied embeddings that is their input too.
+  Non-ASCII bytes cost 2.0-2.4 nats against 0.84 for ASCII in the same windows; they are at most 0.63% of a
+  held-out subject (wikipedia). Digits are ordered (7's nearest: 8, 6, 9, 5); newline sits with `<user>`,
+  `</user>`, `<|endoftext|>`.
+- Router: 256 of 400 rows have a twin above cosine 0.9 even with the mean row removed (grown experts' nearest
+  median 0.95, originals' 0.37); grown rows' own part is half the originals' (0.45 against 0.93); the
+  differences take ~33 directions for 90% of their energy. The experts are distinct: cosine of w2 @ w1, which
+  ignores how an expert orders its units, has median nearest 0.12 and nothing above 0.5 but e18's family.
+- Gates: 72 below 0.01 (1.3% of use; momentum ~100x below the loud experts'), 348 below 0.1; the 20 above 1
+  carry 44.7% of use. Grown gates' median 0.040 at 1.5B, 0.034 at 4.06B; originals' 1.02 -> 1.31. The gate is
+  one tensor, and its decoupled decay shrinks every expert's gate at every step.
+- Specialists: chess sends 58% of its requests to e6, arithmetic 25% to e18 and 13% to e184; their w2 stable
+  ranks are 3.3, 5.9 and 9.0 against a median of 43. Most other subjects share originals (e2, e58, e9, e35, e33).
+- Attention: positive copying scores (eigenvalues of the direct path through the tied embedding) for prelude.0
+  heads 1, 4, 5, 7 and recur head 3, negative for most others; recur head 5's keys compose with prelude.0 heads
+  4-7 at ~3x random. A repeated random string of letters: 3.96 nats, then 1.96 on the repeat.
+- Since 2,329M: the median expert moved 4.3%, trunk matrices 5-10%, embeddings 22%; stable ranks unchanged; 14
+  dead hidden units of 819,200; spectral tail exponents 3-4.
+- Read out after each row on 512-character snippets, the prediction stops improving by row ~8 (0.0065 better
+  than the halted output); on full 4,096-character windows it does not (E50).
+
+**E50 edits to the weights and the read-out (2026-11-03, step 1,983,939, 401 experts).** Every change made in
+memory on a copy; chosen on a dev set of training files (8 subjects x 15 blocks), the finalists measured once
+on held-out, where the unedited model reproduces the run's own 0.5658. Cross-entropy change on dev:
+- rows capped at 10 / 12 / 16 / 20: -0.0002 / -0.0001 / -0.0001 / 0.0000 (8: +0.0033 on a 2-block check);
+  allowed 28 / 32: +0.0001 / 0.0000; halt_thresh 0.8 / 0.95 / 0.99: 0.0000 / +0.0002 / +0.0002
+- logit temperature 0.95 / 1.05: +0.0002 / +0.0015; mixing the rows' probabilities instead of their logits:
+  +0.0002
+- gates below 0.01 zeroed: +0.0001 (below 0.03: +0.0002); grown experts' gates x0.8 / 1.25 / 1.5 / 2: +0.0013 /
+  +0.0022 / +0.0077 / +0.0314; all gates x0.9 / 1.1: +0.0029 / +0.0017; a floor of 0.05 / 0.1: +0.0029 / +0.0133
+- grown router rows' own part x1.5 / 0.7: +0.0204 / +0.0718
+Held-out: the 12-row ceiling -0.0001 (evaluation ~18% faster on dev), gates below 0.01 zeroed 0.0000. The
+held-out figure is halting-weighted cross-entropy 0.5588 plus the 0.01 KL term 0.0069; the returned logits
+(the halting-weighted mixture) score 0.5572. Verdict: no edit improves held-out; the weights sit at a sharp
+optimum for edits like these, and the near-twin router rows' small differences carry real information.
+
+**E51 removing the quietest experts is not zeroing them (2026-11-03, step 1,986,517, 404 experts).** On a copy,
+`PagedPool.drop_quietest(70)` - what `train.py read --drop-quietest 70` runs - removed the 70 experts with |gate|
+0.0040-0.0101 that were off the card and past their newborn window (77 had gates below 0.01; the 7 newborns were
+spared; 2 of the 70 were above 0.01 because 2 below were on the card). Held-out 0.5658 -> 0.5674, cross-entropy
+0.5572 -> 0.5587 (+0.0014; chat_hermes +0.0039, wikipedia +0.0036, chess 0.0000); dev cross-entropy +0.0010.
+Zeroing the same experts' gates had cost 0.0000 (E50): a zero-gate expert is still chosen and adds nothing, while a
+removed one sends its characters to the next expert in line, which adds something. The quiet experts work as the
+router's "add nothing" choice - the pool's own prune() rule warns that a low gate can mark a busy expert. Verdict:
+not dropped; +0.0014 is about 175M characters of the current progress.
+
+**E52 newborns since births resumed are never chosen (2026-11-04, step 2,045,378, 410 experts).** Births stopped
+at the disk ceiling (397 experts) from 10-19 (2,452M) until one moment per expert raised it to ~529 on 11-03;
+growth then added one expert every 3,906 steps (8M characters). From `runs/expert_history.jsonl` (every check's
+gates, use, admissions and births):
+- All 22 experts born since (from step 1,980,379) were admitted to no forward and routed no characters; their
+  gates sit at birth_gate, 0.0010. The 9 past their 48,828-step trial were pruned unused.
+- Earlier newborns were chosen from the start. In their first 50,000 steps, median 1,822 admissions and 20.3M
+  characters routed (born before 2,222.9M, AdamW, one rate), and 1,364 and 16.0M (born under the newborn rate,
+  2,222.9-3,194.4M).
+- Median gate by age. Born 1,500-2,222.9M (AdamW, one rate; 19 experts): 0.0011 at 5k steps, 0.0105 at 25k,
+  0.0275 at 100k, 0.041 at 400k. Born under the newborn rate (100): 0.0133 at 5k, falling to 0.0073 at 50k and
+  0.0068 at 100k, 0.0092 at 400k - a fast start that reversed and settled 4-5x lower.
+- The newborns' router rows sit on the pool's average direction (cosine to the established experts' mean row 0.963,
+  against 0.699 for the established) and are shorter (norm 0.50 against 0.69): averaged from 16 random parents,
+  they are asked for nowhere in particular.
+- A row that is never admitted gets only the balance term's gradient; the language-model gradient reaches only
+  the admitted rows (`PooledMLP._route`). In the router's saved momentum (bf16, unpacked) the newborn rows have norm
+  ~2e-8 against an established median of 6.7e-8, while the rows in use put the top singular values at ~2e-3: five
+  orders of magnitude. After Muon's orthogonalisation (5 Newton-Schulz steps) only ~104 of the 410 directions get
+  a full-size update (singular value above 0.5; median 0.0014). A newborn row gets ~8e-4 of a unit row update, an
+  established one a median 3.4e-3. At x0.0087 that moves a newborn's row ~1e-8 a step, ~0.01 of a logit in 50,000
+  steps. Under AdamW each element is scaled by its own history, so a row with a small but steady gradient moves
+  at the full rate whatever the gradient's size; that is what the balance term was built on
+  (`PagedPool.note_balance`).
+- Not caused by the 11-03 changes, which touch no routing, admission, balance or growth code; they only let births
+  resume. Two things changed in the 1.6B characters without births: Muon took over the router (10-27, 3,194.4M),
+  and the controller eased the rate from ~x0.03 to x0.0087. The momentum above points at Muon on the router as the
+  main cause, with the averaged newborn row adding to it. Raising `pool.balance` would not get past it: the idle
+  rows' balance gradient sits about five orders of magnitude below the rows in use, so the weight would have to
+  rise ~1,000-100,000x, which flattens usage for every expert (E21, E35). Untested on a copy. A copy with forced
+  births would say, with arms for the router under AdamW and a newborn row taken from its largest parent.
+Verdict: growth adds nothing while this holds; each newborn lives through its trial unused and is pruned. Harmless
+to the loss, since an expert that is never admitted is never in a forward.
+
+**E53 the routing bias's floor rule on a tiny model (2026-11-04, CPU).** A paged model of 32 experts (resident 4,
+top_k 2, d_model 32) was trained 400 steps as chat learning trains (LiveLearner, Muon, lr 3e-4). One expert was
+then added by recombination, and training went on from that state twice on the same text: routing bias off,
+and the floor rule on (floor 0.1 of an even share). The newborn's router row started at cosine 0.695 to the
+pool's mean row.
+- Trial of 200 steps, offset step 0.05 (trial x step ~10, as 48,828 x 2e-4 is): off, never admitted in 400 steps
+  (gate 0.0010; row moved 0.008). Floor: admitted 12 times in its trial, 1,459 characters routed, gate 0.0010 ->
+  0.016, row moved 0.035.
+- Trial of 1,500 steps, step 0.01: off, admitted 5 times, 432 characters, gate peaked 0.0053 and fell to 0.0030.
+  Floor: admitted 70 times, 8,226 characters (19x), gate 0.0010 -> 0.088, row moved 0.07; the offset peaked at
+  1.13 and was near 0 at times while admissions went on, so its own row was earning part of its share.
+- In both runs, once the trial ended (and so the offset), no fresh window admitted it on its own (0 of 20).
+Verdict: the rule does what it is for. A newborn whose row no text asks for gets onto the card, is trained, and
+its gate climbs while it is chosen. Whether a newborn then stands on its own row is not decided by the rule; in
+this tiny model the one tried did not. In the run, the first lifted newborns finish their trial ~100M
+characters (~18 hours) after the restart: check their admissions after it (as E52 did).
+
+**E54 the floor rule in the run, its first hour (2026-11-04).** The run restarted at step 2,075,068 with
+route_bias 2e-4 and route_floor 0.1. Twelve experts were on trial, born 2,031,120 to 2,074,086, one every 3,906
+steps. After 1,110 steps each of the twelve carried an offset of 0.222 (1,110 x 2e-4), every other expert 0, as
+the rule says, and none had been admitted yet. How large an offset does a newborn need? Admission is decided by a
+forward's first pass, whose router input depends on the trunk alone, so it was measured on that checkpoint with
+no expert loaded: 6 windows of 2,048 characters per subject, the offsets put on the twelve by hand.
+- Router scores lie close together. Per character they spread 0.46-0.65 (standard deviation across the 410
+  experts), and a newborn sits a median 0.68-0.82 below the character's 8th choice (chess 0.94, arithmetic
+  1.28; the nearest characters 0.07-0.27).
+- At 0.222, at most 0.7% of characters ask for a newborn, and no window admits one. At 0.5, 33-42% of the
+  characters in chat, code, reasoning, self-knowledge and wikipedia ask, and every window admits 4-8 newborns;
+  stories admit in 83% of windows. Arithmetic and chess need 0.75.
+- The twelve rise together and their rows are nearly the same (all near the pool's mean row). Above 1.0 they
+  would take 10-12 of the card's 32 slots in every window, and at 2.0 nearly every character's choices. What
+  stops that is the rule's own feedback: an expert whose 50-step share of choices reaches the floor starts
+  falling, a few to 50 steps (at most 0.01 of offset) after it crosses.
+- The first admissions came before the median window's edge. By step 2,076,737 (offset 0.333, 1,669 steps
+  after the restart), two of the twelve had been loaded onto the card, 3 times and once, and had routed 1,012
+  and 35 characters. They are the first newborns admitted since births resumed on 11-03. The tails of the
+  training text admit before the median window does. Held-out stayed at 0.5641-0.5642 (0.5644 at the last
+  check before the restart).
+- By step 2,077,305 (2,237 steps after the restart), 11 of the twelve had been admitted: 1-9 loads each,
+  9,504-300,674 characters, 1.32M in all. The feedback had held every admitted one below the 0.447 the rule
+  alone gives (0.326-0.437); the one never admitted was still at 0.447. Their 50-step shares were 0.01-2.8x
+  an even share, gates 0.0010-0.0011, held-out 0.56425. The twelve did not flood the card: each found its own
+  level. Gates move slowly at the controller's rate (x0.0086 of 3e-4, ~2.6e-6 a step).
+- The first trial to end under the rule (born 2,031,120, trial over at step 2,079,948) had been loaded onto the
+  card 21 times and routed 908,296 characters while lifted, its gate 0.0010 -> 0.0012. In the 2,968 steps after,
+  its offset 0, it was not admitted once. By step 2,082,916 the others had been loaded 17-80 times and routed
+  0.5-3.0M characters each, gates 0.0009-0.0015. Their held offsets stayed within about 0.02 of where they were
+  two hours earlier (0.31-0.45): an offset held by the floor measures how far the newborn's own row falls short
+  of the card's edge, and in those two hours no row closed its gap. Held-out averaged 0.56444 over the 11
+  checks after the newborns entered, against 0.56454 over the 8 checks before the restart: no cost seen.
+Expected: the run makes ~2,800 steps an hour, so the offsets climb ~0.56 an hour and reach 0.5 about an hour
+after the restart. From then most windows admit newborns, and each offset should hover near its own edge,
+where its newborn takes a tenth of an even share. To check: held-out over the next hours (the twelve enter together);
+each newborn's offset and share; and admissions after the trial ends. The oldest, born 2,031,120, leaves its
+trial at step 2,079,948 after at most ~2,400 steps on the card. The first newborn lifted for a whole trial is
+one born after the restart. Past its trial, prune keeps an expert until it has gone a whole trial (48,828
+steps) without an admission, so a newborn that is never chosen on its own row fades out ~17 hours after its
+last lifted admission.
+Verdict at 3.5 hours (step 2,084,590): the rule fixed admission, and nothing more is shown yet. All 14 newborns
+lifted since the restart were admitted (0.5-3.5M characters each). Held-out since the restart sits 0.0002 below
+the line of the 12 hours before. But that gap was there at the first checks, before any newborn was admitted, and
+the 8 restarts of 10-28 to 11-03 moved held-out by -0.0013 to +0.0012 against their own lines, so a comparison
+across a restart cannot see an effect this size. Both newborns whose trials had ended (4,390 and 557 steps
+earlier) routed nothing after it. The ten still held on trial lowered their offsets by 0.009 on average in 2.6
+hours (0.370 to 0.361): about 100 hours' worth to close the gap, where a trial leaves at most 17. A likely reason
+is in `PooledMLP._route`. Mixed before the gates (gate_after false), a newborn at gate 0.001 takes weight from the
+strong experts beside it, so the language-model gradient moves its row away from the characters it is lifted to.
+Its gate grows at the controller's rate (0.0010 to 0.0012-0.0015 in 3 hours). Untested lever:
+`growth.birth_gate_parents` (a newborn's gate as a share of its parents'), which gives its output a voice while
+the floor bounds its share. A same-checkpoint A/B with forced births is the way to decide.
+
+**E55 the balance term under Muon, in the run (2026-11-05, step 2,115,355, 419 experts, CPU).** `pool.balance`
+was 2e-5 by 11-05 (1e-5 from 10-23). The term reaches only the router's rows and is computed from a forward's
+first pass, whose input depends on the trunk alone, so its gradient was computed exactly on a copy of that
+checkpoint with no expert loaded: 6 windows of 2,048 characters per subject, weighted by the subjects' shares.
+The router's saved momentum (Muon's one moment) holds the rest.
+- The term is 2e-5 x 0.134 (E x sum(u x P) - 1, 0 when use is even; 0.03-0.29 across windows), ~3e-6 nats on
+  the training loss. Its gradient is 1.0e-5 (Frobenius), 0.12% of the router's momentum (8.5e-3).
+- On the 50 rows that no forward had admitted in the last 400 texts, the momentum is the term's gradient
+  (cosine 0.86) at 0.31 of its size. That is the clip: the run's gradient norm is ~3.3 against a clip of 1.0. A
+  weight of 1e-5 would give 0.15, so the run uses 2e-5. On rows in use the term is a median ~4% of the row's momentum.
+- Muon's step moves a row in use a median 0.031 of a full row, the same without the term; the term's part is
+  0.002. Rows not admitted move 0.001-0.002. At this step size (1.13e-5 per full row) the term raises an idle or
+  newborn expert's mean score ~0.0001 an hour, ~0.002 over a trial. That compares with a score spread of 0.53
+  across experts and the ~0.36 a newborn needed to reach the card (E54). The floor rule moves an offset 0.56 an
+  hour.
+- Carried on in a constant direction (an upper bound), the term's part of the step would change 0.44 of a
+  window's 32 card slots after a trial's worth of steps (17.4 h), 2.3 after a week and 6.4 after 30 days. The
+  whole step, under the same bound, changes 12.9 in 17.4 h.
+- Use is spread by the texts' votes instead. 307 of 419 experts hold a share of recent admissions above 1e-4.
+  Every one of the 409 experts present at both steps 2,076,178 and 2,115,355 was admitted between them. Router rows
+  moved a median 1.22% of their norm in those 14 hours, 0.97% of it weight decay.
+Verdict: at 1e-5 to 2e-5 under Muon the term barely touches the network, and doubling it doubled a negligible
+effect. Under AdamW each element's step was scaled by its own history, so a row with only this gradient moved
+at the full rate whatever the weight; E21's 0.01 took the experts in use from 59 to 114 in 15 minutes. Muon's
+five Newton-Schulz steps cannot lift directions this far below the strongest (E52). Turning it off should change
+nothing measurable. To matter it would need ~1,000x or more, which flattens every expert's use (E21, E35). The
+weight is the author's. The comments on it in config.yaml and `PagedPool.note_balance` still describe AdamW.
+
+**E56 how the greedy loops start (2026-11-06, step 2,162,417, 424 experts, CPU).** The raw greedy samples the run
+logged at this step were replayed on a copy of its weights, one forward per character as `sample_now` writes them
+(the CPU's argmax was the logged character at 1,259 of 1,260 positions). Every choice was recorded with its
+distribution and its copy candidate: the character that continued the longest earlier occurrence of the text's
+current suffix.
+- Arithmetic (after `5205`, every line `add 3 + 1 = 4`): the digits are exact ties. The first operand's '3' won
+  0.110 to 0.109, the second's '1' 0.103 to 0.102, and every later line repeats them at 0.109/0.109 and
+  0.102/0.101: the repeat wins each tie by under 0.001 and its probability never rises. Only choices that were
+  already the argmax drift toward the repeat ('a' starting a line 0.477 -> 0.821; the space ending a one-digit
+  operand 0.107 -> 0.220). The generator itself gives every first digit 1-9 0.110 (2M lines of
+  `corpora/arithmetic.py`), and its own character-by-character argmax is `add 6 + 2 = 8`: one-digit addition, the
+  shape the model writes. Lines are drawn independently, so the next line has the same argmax: a perfect model of
+  the lane loops under greedy decoding.
+- Code (`Merge a sorted array of sorted array ...`, period 16), wikipedia (period 74) and chat_hermes (a line
+  repeated, period 39) start at open choices the copy wins narrowly (code: 'array' 0.258 against 0.150, 'of'
+  0.279 against 0.221; wikipedia '[[R' 0.116 against 0.067) and then feed themselves. In the code loop the mean
+  probability of the chosen characters per repetition is 0.831, 0.868, 0.881, 0.905, 0.923, 0.956, 0.988, the
+  least likely choice in a repetition rises from 0.258 to 0.890, and entropy falls from 0.64 to 0.08 nats.
+- Xu et al. 2022's self-reinforcement measurement on held-out text (a real line or sentence after 200 characters
+  of its own preceding text, repeated 6 times; 37 spans): the mean probability of its characters per repetition
+  is 0.776, 0.851, 0.881, 0.894, 0.903, 0.911, and the share that are the argmax 0.824 -> 0.936. Per subject,
+  first to sixth: wikipedia 0.664 -> 0.990 (1 span), chat_hermes 0.712 -> 0.982, chat 0.823 -> 0.957, code
+  0.839 -> 0.966, reasoning 0.790 -> 0.932, stories 0.765 -> 0.877. None in arithmetic (0.788 -> 0.769, 4
+  spans) or chess (0.824 -> 0.814, 2 spans): there a repeated line gains nothing.
+- Real held-out text, teacher-forced (3 windows of 1,536 characters per subject; a copy candidate needs an
+  earlier match of 4+ characters). At open choices (entropy above 1 nat) the argmax is the copy candidate more
+  often than the real text copies, in every subject: arithmetic 4.1% against 1.8%, chat 10.0/6.0, chat_hermes
+  6.5/4.9, chess 10.4/7.5, code 14.6/10.3, reasoning 20.2/13.4, stories 10.4/9.4, wikipedia 16.3/11.4. Near-tie
+  copies (the argmax is the copy candidate, less than 1 logit ahead) are 1.1-3.4% of characters, 2.2% equally
+  weighted, and right 40-55% of the time (arithmetic 15%). Lowering every one of them to 0.5 logit below the
+  runner-up would change the loss on the real character by -0.0004 nats per character (arithmetic) to +0.0071
+  (reasoning), +0.0033 equally weighted.
+Verdict: the two mechanisms the literature names. Ties at genuinely open choices are broken toward the copy
+(arithmetic), which a perfect predictor does as well, so predicting better cannot remove it; and a copy, once
+made, raises the odds of the next (prose and code), Xu et al.'s self-reinforcement at about their size. Both
+are what training-time objectives against repetition target (adaptation.md section 7). A margin against the
+copy is not free on the reading distribution outside arithmetic: at a near tie the copy is right about half
+the time, so demoting it there bluntly costs ~6x the run's ±0.0005 noise in held-out.
+
+**E57 loop practice against greedy loops (2026-11-06, step 2,163,711, 424 experts).** The run was stopped for
+this. `tools/loop_meter.py` (new) measures greedy writing against real text on a weights directory, read only:
+the 9 sample prompts as the raw reading writes them, 48 real held-out openings (6 per subject, 512 characters
+of real text, 256 written) against their real continuations, the self-reinforcement curve (12 real spans per
+subject repeated 6 times after 200 characters of their own text), and copying at open choices. A loop is a
+block repeated 3+ times at a text's end over 24+ characters, with a letter or digit, not one character.
+- Baseline, the run's weights: samples 31.2% repeated 8-grams, 2 of 9 end in a loop (arithmetic, code;
+  chat_hermes 64% and wikipedia 51% repeat without a clean loop). Openings: 10 of 48 written continuations end
+  in a loop, none of the real ones; repeated 8-grams 39.5% written against 6.7% real. A repeated span's mean
+  probability by repetition 0.748, 0.705, 0.771, 0.801, 0.817, 0.829. At open choices the argmax copies 12.8%,
+  the real text 9.7%; where the real text continues an earlier passage of 8+ characters the argmax does too
+  96.2% of the time (repetition the writer intended).
+- Loop practice (`minagi/practice.py`, `training.loop_practice_*`): after a reading step, one more optimizer step
+  on a real span of the window just read (8-200 characters, from a word start to a space or newline, never one
+  its own text repeats) written out 6 times after up to 512 characters of its real preceding text, with the
+  one-sided term mean over n of relu(log P_n - sg(log P_(n-1)) - log 0.5) / L - each copy at most half as likely
+  as the one before, spelling left alone because a span's log-probability pushes hardest where the choice was
+  open. Speed probe, not controlled: a copy read 1M characters at the run's rate with a practice step after
+  every reading step (488 of them; 1.6 s a step against ~1.07). The term stayed ~0.145; its gradient norm is
+  ~43, so every practice step is clipped to 1 and weighs as much as a reading step. Samples 31.2% -> 15.0%
+  repeated 8-grams (code 77% -> 11%, its loop gone; chat_hermes 64% -> 2%; reasoning 14% -> 2%; wikipedia
+  51% -> 32%; arithmetic 75% -> 86%, still a loop). Openings: loops 10 -> 7 of 48, repeated 8-grams
+  39.5% -> 30.8%. The repeated span's probability by repetition 0.742, 0.673, 0.711, 0.732, 0.748, 0.762
+  (baseline 0.829 at the sixth). Intended repetition kept 96.2% -> 95.1%. Arithmetic is untouched as expected:
+  there a repeated line already loses probability (0.650 -> 0.539 by the sixth), so the term never fires; its
+  loops are ties (mechanism 1), which is what `training.tie_preference` is for.
+- A/B (`tools/ab_pool.py --meter`, every arm a copy of the stopped run's weights reading the same 3M characters
+  at the run's rate; held-out of the weights as they were 0.5587 over 960 blocks). Control, as the run reads:
+  held-out 0.5587; the feeding curve unchanged (0.829 at the sixth repetition); samples 32.5% repeated 8-grams,
+  2 loops; openings 8 of 48 loops, 36.2% repeated 8-grams; intended repetition kept 96.4%. Reading alone does
+  not move repetition over 3M characters, so what the probe changed was the practice.
+- both2 (practice after every 2nd reading step, lambda 0.5, every copy scored; tie preference weight 1, eps and
+  margin 0.1 logit, 5.6 positions a step): held-out 0.5618, +0.0031 on control (wikipedia +0.0065, code
+  +0.0044, reasoning +0.0043, chat_hermes +0.0040, chat +0.0036, stories +0.0019, arithmetic and chess +0.0002).
+  Samples 32.5% -> 13.4% repeated 8-grams (code 77% -> 8%, chat_hermes 64% -> 6%, wikipedia 51% -> 19%,
+  reasoning 14% -> 2%; arithmetic still a loop). Openings: loops 8 -> 8 of 48 (arithmetic 4 -> 5), repeated
+  8-grams 36.2% -> 31.8%. Sixth-repetition probability 0.829 -> 0.745 (prose subjects 0.95 -> 0.82-0.86).
+  Intended repetition kept 96.4% -> 95.4%, lower in every subject (wikipedia 95.2% -> 92.0%). The cost sits
+  where the term fires: scoring the first copy against the original pushes against copying a passage at all,
+  which real text does often. Next arm: the first copy left free (`training.loop_practice_free` 1).
+- practice2 (practice after every 2nd step, every copy scored, no tie term): held-out 0.5617, +0.0030 - the
+  whole cost of both2 is the practice; the tie term at weight 1 cost nothing measurable and did nothing
+  measurable in 3M characters (samples 12.5%, openings 7 of 48 loops, the same feeding curve and intended
+  repetition 95.4% as both2). With arithmetic 3% of reading, a few hundred of its ties met the term.
+- free2 (practice after every 2nd step with the first copy left free, `loop_practice_free` 1): held-out 0.5617,
+  the same +0.003; the same feeding curve (0.742 at the sixth repetition) and intended repetition (95.3%);
+  openings 12 of 48 loops. Leaving the first copy free changes nothing, so the cost is not what the term asks
+  but how often practice takes a step: at every 2nd step a third of all updates are practice, and under Muon each
+  moves the weights a full step away from where reading had settled. The option was removed again.
+- The tie preference cannot break arithmetic's ties from real text. Arithmetic-only probes, 330k characters (160
+  steps) at the run's rate, weight 5, margin 0.3 logit: counting the continuation of ANY earlier occurrence as a
+  copy fired 88 times a step but in a long arithmetic window every digit has followed some earlier `add `, so it
+  only shuffled the top of every tie (openings 6 -> 4 of 6 looping, the sample still a loop); counting only the
+  LATEST occurrence fired 26 times a step and changed nothing (6 of 6). In real text the line before is random;
+  in writing it is the model's own mode line, so the term never practises the situation the loop forms in.
+  Removed. Arithmetic's free-running loop is mechanism 1 and stays: the lane's own argmax line repeated.
+- practice8 (practice after every 8th step, 184 practice steps): held-out 0.5590, +0.0003 on control - inside
+  the run's noise. Samples 32.5% -> 18.1% repeated 8-grams (code 77% -> 8%, its loop gone; chat_hermes 64% ->
+  8%; wikipedia 51% -> 45% and reasoning 14% not yet); openings 7 of 48 loops, 36.3% repeated 8-grams; sixth
+  repetition 0.829 -> 0.814; intended repetition kept 96.2% (control 96.4%). The cost falls much faster than the
+  rate: a quarter of the practice for a tenth of the held-out.
+Verdict: loop practice is what works here, in the weights, with greedy decoding left plain. Set to every 8th
+step (`training.loop_practice_every` 8, from the run's next start, chat learning included): no measurable cost,
+the code and word-problem loops gone at once, and the rest gaining as the steps add up; every 2nd step does
+more sooner for +0.003. The tie preference and freeing the first copy were dropped. Arithmetic's free-running
+loop stays, so the `[adapted]` reading stays until raw greedy is nearly free of repetition. Untested next
+steps for arithmetic: a generator whose next line never repeats a recent line's start (Pipis et al.'s margin
+in the data), or loop-onset preference rounds on the model's own writing.
+
+**E58 self-play against loop practice (2026-11-06, step 2,170,135).** Proposed by the author: instead of synthetic
+repetitions, let the model write from a starting point and learn away from what it wrote. Pushing its own text
+down alone cannot work: over text sampled from the model itself the push is zero in expectation (the sum of
+p times the gradient of log p is the gradient of 1), and over greedy text it flattens the model around
+everything it writes, right or wrong. With the real continuation of the same prefix as the positive it is
+self-play in the manner of SPIN (Chen et al. 2024). Built as `training.self_play_every` (`minagi/practice.py`
+`self_play_term`, `FileReader.self_play`): after every Nth reading step the model writes 64 characters on from
+a word start in the window just read (greedy by default, `self_play_sample` draws them), then one training
+forward of two rows - the prefix with the real continuation, the prefix with its own - and one step on
+-log sigmoid((lp_real - lp_own) / 64). Where the two agree the pushes cancel. With the current model as the
+reference and drawn continuations the update is, in expectation, plain likelihood on the real text; only greedy
+continuations add a push of their own, against the model's mode in the states it writes itself.
+A/B from the same weights, 3M characters each, with held-out and the loop meter: control (the run as it is,
+loop practice every 8th step), selfplay8 (self-play every 8th step instead), none (neither).
+- Held-out of the weights as they were 0.5592 (960 blocks). control (loop practice every 8th step, as the run):
+  0.5593; samples 16.6% repeated 8-grams (the morning's baseline 31.2%: the run's own loop practice since its
+  restart shows), openings 7 of 48 loops, sixth-repetition probability 0.770, intended repetition 96.1%.
+  selfplay8 (self-play every 8th step, no loop practice): 0.5590, -0.0003 on control and lower in seven of
+  eight subjects (wikipedia -0.0010; within the noise, but one-sided); samples 20.7%, openings 8 of 48, sixth
+  repetition 0.796, intended 96.1%; reading 34 min against 28 (+21%). Its own continuation agreed with the real
+  one at 14 of 64 characters and stayed 0.35 nats a character likelier than the real one: the term never
+  settled.
+- none (neither): held-out 0.5589. Paired on the same blocks against control, selfplay8 and none are both
+  -0.0004 +/-0.0001: loop practice every 8th step costs ~0.0004 in held-out (E57's +0.0003 was the same cost,
+  then within the noise), and self-play costs nothing over doing nothing. On loops self-play is close to doing
+  nothing: samples 20.7% against 23.2% (none) and 16.6% (control), sixth-repetition probability 0.796 against
+  0.799 and 0.770; its one clear effect is the code sample (19% against none's 53%). Closeness of written text to
+  the real continuation unchanged (8-character overlap 0.090 against 0.091), non-words 1.5% against 1.7%.
+  Reading speed 1,485 characters a second against 2,009 for none and 1,840 for control: self-play costs a
+  quarter of the reading, loop practice an eleventh.
+Verdict: not worth pursuing instead of loop practice. It costs three times as much reading, does a fraction as
+much against loops, and showed no gain in closeness to real text over 3M characters. As expected: with the
+current model as reference its only new push is against the greedy mode in its own states, spread over all of
+its choices rather than the ones that loop, and the real continuation's push is plain likelihood. Loop practice
+stays at every 8th step; its held-out cost is now measured at ~0.0004. Self-play's code is off by default; its
+pair loss is what correction feedback would use (the feedback-learning direction).
+
+**E59 issue #33 again, every subject (2026-11-07, step 2,184,784, 423 experts, CPU).** E48's method on a
+hard-link snapshot of the weights, taken while the run trained: each held-out block (4,096 characters, two
+forwards of 2,048 through the cache) scored the published way and causally - position i routes among the top
+32 of the vote over positions 0..i, which is what writing one character at a time computes. Runs of positions
+with the same causal set are one forward with that set forced; a position whose vote holds fewer than 32
+experts is a single-character forward with the vote preset, as in writing. The per-position requests follow
+`minagi.pool.requests` with the floor rule's lifted probability and summed to what `admit` was given within
+1.1e-4. fp32, 3 spread blocks a subject, 49 s a block.
+- Causal minus published, nats/char: arithmetic +0.0044, chat +0.0157 (one block +0.0315), chat_hermes +0.0077,
+  chess +0.0021, code +0.0090, reasoning +0.0119, stories +0.0089, wikipedia +0.0076 (one block -0.0019). All 24
+  blocks +0.0084 +/-0.0014 (+0.012 bits/byte); E48 had +0.004 to +0.011 at step 1,773,530.
+- Each block's first chunk +0.0158, its second +0.0010: the first chunk's vote starts empty, and by the second
+  the 2,048 characters already read outweigh the chunk's own.
+- The causal sets of a first chunk's positions span 77-110 experts between them (subject means), a second
+  chunk's 34-47, so a 32-slot card holds neither in one forward.
+- The issue's repro prints its four lines unchanged on the working tree. Writing is not affected: every written
+  character is a forward of its own, and a prompt's last position sees only what came before it.
+- enwik9: 30 pieces of 2,048 bytes spread over the slice, each read cold as the frozen row reads them: published
+  1.257 bits/byte, causal 1.279, +0.0221 +/-0.0023 (+0.0153 nats/char), higher causally in all 30 (+0.003 to
+  +0.042 nats/char). The frozen and dynamic rows score every piece cold. The best-effort row reads pages from
+  their tops and was not measured.
+- Forwards an exact causal reading needs with a per-position mask, cutting a forward wherever its positions'
+  sets together outgrow the card. 32 slots: 123 a held-out first chunk (61-275), 30 a second, 97 an enwik9
+  piece - a character needs all 32, so every change of set is a new forward, as slow as this method. 48 slots:
+  5.0, 1.0 and 4.3. 64 slots: 2.5, 1.0 and 2.1. A vote first holds 32 experts at the 6th character on average
+  (4-18).
+Verdict: the issue is real and the published scores are optimistic, by ~0.008 nats/char on held-out and ~0.022
+bits/byte on cold enwik9 pieces; writing is unaffected. The fix is scoring, not training: a scoring forward
+routes each character among its causal set on a card of 48-64 slots of inference copies (0.3-0.4 GB in bf16).

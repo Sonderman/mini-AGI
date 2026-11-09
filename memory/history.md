@@ -424,3 +424,80 @@ remove the newborn rate, newborn gate as a share of parents', and Muon (Liu et a
   workshop's never; the conventions on commits, the README and publishing follow release.sh.
 - 10-31: agents no longer commit: the author examines every change and makes every commit. An agent hands
   over finished work uncommitted, with a proposed commit for each group of changes (conventions.md, Commits).
+
+## 2026-11-03 - one moment under Muon, shares of characters
+
+- 11-03: Muon keeps no second moment for the matrices it steps. AdamW's exp_avg_sq had been carried for them
+  since the switch, unread: on the card (fp32, ~0.4 GB for the 32 expert slots), in the RAM tier, in optim.npz
+  and in every expert file, a quarter of its 25.2 MB. Files, RAM entries and checkpoints now hold the momentum
+  alone where Muon steps (`PagedPool.keep_second_moment`, set before the start's held-out check), and an
+  expert costs 18.9 MB, so `growth.max_disk_gb` 10 holds ~529 instead of 397. A run that moves back to AdamW
+  starts the missing second moment from the momentum squared, which holds its first steps near the rate.
+  Training is the same step for step. Weights saved this way need this code to resume with an optimiser.
+- 11-03: the reading shares are of characters, as the rule that sets them values characters (E47). The
+  round-robin's credit is paid by the characters each visit read, not one a visit, so a lane of long files
+  (chess, arithmetic: ~32,768 a visit) is visited less often than one of short files (wikipedia: ~5,300) and reads
+  its share. A visit that reads nothing is charged as a full one. The first start carries the saved visit shares
+  over as the characters they gave (each times its lane's mean visit, from the files' sizes), so the reading does
+  not jump, then the shares move toward the targets at most 5% a check: wikipedia ~11% -> ~30% of characters,
+  chess ~16% -> ~7%, arithmetic ~7% -> ~3% at the targets of 11-03. `equal` and `--lane-weights` are of characters too.
+- 11-03: `pool.ram_cache` 288 -> 384: with one moment an expert takes 18.9 MB, so 384 hold what 288 did.
+- 11-03: the weights read directly (E49) and 27 edits to them tested on a copy (E50): none improves held-out.
+  What they found - near-twin router rows, gates decayed whether used or not, collapsed byte embeddings, the KL
+  term inside the held-out figure - is listed in state.md, not yet acted on.
+- 11-03: dropping the 70 quietest experts was measured before doing it (E51): +0.0014 held-out cross-entropy,
+  where zeroing their gates had cost nothing (E50). Not dropped.
+
+## 2026-11-04 - newborns that are never chosen
+
+- 11-04: the run's own history shows that no expert born since births resumed on 11-03 has been chosen (E52): 22
+  births, no admissions, the ones past their trial pruned unused. Earlier newborns were chosen from their first
+  steps. Not acted on yet; the cause is untested.
+- 11-04: **the routing bias's floor rule** (`pool.route_floor`, for the next start): an expert on trial taking less
+  than a tenth of an even share of training choices is lifted 2e-4 a step where experts are chosen, falls back to 0
+  as its own row earns the share, and has no offset off trial; a lifted request counts lifted in the card's vote.
+  The DeepSeek-style offsets rejected in E21/E35 steered every expert toward a curve; this one lifts only newborns.
+  README's growth paragraph and the balance paragraph's Adam clause updated to match (E52, E53).
+- 11-04: the run restarted with the floor rule at step 2,075,068. After 1,110 steps the twelve experts on trial
+  carried 0.222 each and every other expert 0; none admitted yet. Measured on that checkpoint's first pass, a
+  newborn needs about 0.5 to reach most windows' cards; the first two were admitted earlier, at 0.333, 1,669
+  steps after the restart. The twelve rise together, so the rule's feedback is what keeps them from taking the
+  card. Within an hour 11 were admitted, each held at its own offset, with held-out unchanged. The first to end
+  its trial was not admitted again on its own row (E54).
+
+## 2026-11-05 - the balance term under Muon
+
+- 11-05: `pool.balance` was 2e-5 at that day's restart (1e-5 from 10-23). Measured on the checkpoint of step
+  2,115,355, the term's gradient is 0.12% of the router's momentum. Its part of Muon's step raises an idle or
+  newborn expert's score ~0.0001 an hour. Carried on in one direction for a trial, it would change under half of
+  a window's 32 card slots. Use is spread by the texts' votes, not by the term (E55).
+
+## 2026-11-06 - where greedy loops come from
+
+- 11-06: replayed on a copy, the raw greedy samples' loops have two causes (E56). In arithmetic every digit is a
+  tie (0.109 against 0.109) broken toward the line just written, the same tie the generator's own distribution
+  has, so even a perfect model of the lane would repeat one line. In prose and code a copy made at an open
+  choice raises its own odds: a sentence repeated six times goes from 0.78 to 0.91 mean probability. Literature
+  on training these away surveyed (adaptation.md section 7).
+- 11-06: the run was stopped at step 2,163,711 for this. **Loop practice** built (`minagi/practice.py`,
+  `training.loop_practice_*`, also in chat learning): after a reading step, a step on a real span of the window
+  written out six times, each copy held to at most half as likely as the one before. `tools/loop_meter.py`
+  measures greedy writing against real text; `tools/ab_pool.py --meter` runs it on every arm. From the same
+  weights and 3M characters, practice after every 8th step took the sample prompts from 32.5% to 18.1% repeated
+  8-grams (the code and word-problem loops gone) for +0.0003 in held-out, inside the noise; every 2nd step
+  reached 12.5% for +0.003. Set to every 8th step for the next start. A tie preference against the copy at free
+  choices did nothing measurable and was removed; arithmetic's free-running loop remains, and so does the
+  `[adapted]` reading (E57).
+- 11-06: **self-play** (`training.self_play_every`, off): the model writes 64 characters on from a place in the
+  window and one step raises the real continuation and lowers its own. A/B from step 2,170,135, 3M characters:
+  no held-out gain over doing nothing, little against loops (samples 20.7% against 23.2% with neither and 16.6%
+  with loop practice), a quarter of the reading speed. Not adopted; loop practice stays, its held-out cost now
+  measured at ~0.0004 (E58).
+
+## 2026-11-07 - issue #33 measured on every subject
+
+- 11-07: issue #33 (a forward's 32 experts are chosen by every character in it, later ones too) is still
+  present. Scored causally, as writing reads, held-out is +0.0084 +/-0.0014 nats/char above the published way
+  over all 8 subjects, nearly all in each block's first 2,048 characters, where the vote starts empty (E59).
+  Writing is not affected. Proposed: causal scoring in every evaluation, then a correction of the published
+  numbers; training keeps the window's vote, since nothing learns through admission.

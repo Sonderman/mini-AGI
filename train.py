@@ -885,6 +885,15 @@ def cmd_read(args):
               f"on each expert in proportion to that expert's share of recent "
               f"admissions (balance {pool.balance:g}), so the whole pool gets "
               f"used")
+    if getattr(pool, "route_bias", 0) > 0:
+        if getattr(pool, "route_floor", 0) > 0:
+            print(f"  an expert on trial that takes less than "
+                  f"{pool.route_floor:g} of an even share of choices is lifted "
+                  f"toward the characters, {pool.route_bias:g} a step, until "
+                  f"its own row earns it the share (route_floor)")
+        else:
+            print(f"  every expert's choices are steered toward its rank's "
+                  f"share, {pool.route_bias:g} a step (route_bias)")
 
     if args.no_pool_checkpoint:
         n_off = 0
@@ -904,6 +913,10 @@ def cmd_read(args):
                      kind=args.optimizer, fused=(device.type == "cuda"),
                      which=args.muon_params)
     print(f"  {muon.describe(opt)}")
+    if hasattr(pool, "keep_second_moment"):
+        # said now, before the start's held-out check reads experts into RAM:
+        # where Muon steps them, their files' second moments are never read
+        pool.keep_second_moment(muon.keeps_second(opt, pool.w1))
     snr = GradSNR()
     print(f"  trunk learns at {args.trunk_lr_mult:g}x the pool's rate "
           f"({sum(q.numel() for q in trunk)/1e6:.1f}M trunk, "
@@ -1129,12 +1142,19 @@ def cmd_read(args):
     fixed = _lane_weights(getattr(args, "lane_weights", ""),
                           [l.name for l in lanes])
     mode = "fixed" if fixed else getattr(args, "lane_schedule", "auto")
-    sizes = {l.name: sum(os.path.getsize(p) for p in l.paths
-                         if os.path.exists(p)) for l in lanes}
+    # what each lane holds, and what one visit to it reads: a passage, or a
+    # shorter file whole - which turns a saved share of visits into the share
+    # of characters it was (LaneSchedule.restore)
+    span = _visit_chunks(ctx_now, args.chunk, args.passage) * args.chunk
+    sizes, per_visit = {}, {}
+    for l in lanes:
+        got = [os.path.getsize(p) for p in l.paths if os.path.exists(p)]
+        sizes[l.name] = sum(got)
+        per_visit[l.name] = sum(min(g, span) for g in got) / max(len(got), 1)
     sched = LaneSchedule.restore(
         (man or {}).get("lanes"), [l.name for l in lanes], sizes,
         list(ev.groups) if ev is not None else [], mode=mode, weights=fixed,
-        total=float(man.get("read_chars", 0) or 0))
+        total=float(man.get("read_chars", 0) or 0), per_visit=per_visit)
     if parts is not None:
         # the level held-out is read at has just moved: fit again from the
         # log, which draws everything before on the new level
@@ -1231,6 +1251,17 @@ def cmd_read(args):
     recent = collections.deque(maxlen=400)     # the training loss lately
     loss_log = (open(args.loss_log, "a", buffering=1, encoding="utf-8")
                 if getattr(args, "loss_log", None) else None)
+    # Loop practice (minagi/practice.py) draws its own random numbers, so the
+    # text read is the same with it on or off.
+    practice_every = int(getattr(args, "loop_practice_every", 0) or 0)
+    prng = np.random.default_rng([max(0, int(args.seed)), 7041,
+                                   max(0, int(step))])
+    practiced = collections.deque(maxlen=400)
+    practiced_gn = collections.deque(maxlen=400)
+    play_every = int(getattr(args, "self_play_every", 0) or 0)
+    sprng = np.random.default_rng([max(0, int(args.seed)), 7042,
+                                   max(0, int(step))])
+    played = collections.deque(maxlen=400)      # (term, agreeing characters)
     last_gap = None                            # held-out minus train, when known
     # How much information has been read, as against how many characters were
     # passed over: the loss IS the information content of what was read, so
@@ -1325,6 +1356,9 @@ def cmd_read(args):
             r = lane.open(model, args.chunk, ctx_now, device,
                           turn * args.chunk)
             if r is None:
+                # nothing to read there: charged as a full visit, so the
+                # schedule moves on rather than picking it again
+                sched.missed(lane.name, turn * args.chunk)
                 continue
             path, data = r.name, r.data
             fl = []
@@ -1401,6 +1435,34 @@ def cmd_read(args):
                                    else None),
                          "t": round(time.time(), 2)},
                         separators=(",", ":")) + "\n")
+                if practice_every and (step + 1) % practice_every == 0:
+                    # One more step, on a real span of this window written
+                    # out again. Nothing is read, so the cursor, the
+                    # characters counted, the loss log and the clocks stay
+                    # where the reading left them.
+                    opt.zero_grad(set_to_none=True)
+                    pl = r.practice(args.loop_practice_lambda,
+                                    args.loop_practice_reps, prng)
+                    if pl is not None:
+                        pl.backward()
+                        practiced_gn.append(float(
+                            torch.nn.utils.clip_grad_norm_(
+                                model.parameters(), args.clip)))
+                        opt.step()
+                        practiced.append(float(pl))
+                if play_every and (step + 1) % play_every == 0:
+                    # One more step: the model writes on from a place in
+                    # this window, and learns the real continuation up and
+                    # its own down. Nothing is read, as with practice.
+                    opt.zero_grad(set_to_none=True)
+                    sp = r.self_play(args.self_play_chars, sprng,
+                                     args.self_play_sample)
+                    if sp is not None:
+                        sp.backward()
+                        torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                                       args.clip)
+                        opt.step()
+                        played.append((float(sp), r.played["agree"]))
                 by_pos[j].append(float(loss))
                 seen += args.chunk
                 nats += float(loss) * args.chunk
@@ -1480,6 +1542,9 @@ def cmd_read(args):
                     print(f"    samples -> {args.sample_log}"
                           + (f"  train {float(np.mean(recent)):.4f}"
                              if recent else "")
+                          + (f"  loop practice {float(np.mean(practiced)):.4f}"
+                             f" (grad {float(np.mean(practiced_gn)):.2f})"
+                             if practiced else "")
                           + (f"  held-out {v_:.4f}" if v_ is not None else "")
                           + (f"  logit {max(logits.values()):.1f}"
                              if logits else "")
@@ -1629,6 +1694,16 @@ def cmd_read(args):
           f"checks and samples included)")
     if losses:
         print(f"  mean loss over the files: {np.mean(losses):.4f}")
+    if played:
+        print(f"  self-play: last {len(played)} steps' term "
+              f"{np.mean([p for p, _ in played]):.4f}, its own continuation "
+              f"agreeing with the real one at "
+              f"{np.mean([a for _, a in played]):.1f} of "
+              f"{args.self_play_chars} characters")
+    if practiced:
+        print(f"  loop practice: last {len(practiced)} steps' term "
+              f"{np.mean(practiced):.4f}, gradient norm "
+              f"{np.mean(practiced_gn):.2f} against a clip of {args.clip:g}")
 
     if ev is not None:
         v = ev.run(eval_steps, spread=True); se = v.pop("stderr", 0.0)
@@ -1728,8 +1803,9 @@ def _sample_variants(args):
     and it is the one whose repeat rate is a fact about the model rather than
     about the decoding rule.
 
-    --sample-raw-only drops the guarded reading, for when the raw text is good
-    enough that the guard is no longer telling you anything.
+    --sample-raw-only, or samples.raw_only in config.yaml, drops the guarded
+    reading, for when the raw text is good enough that the guard is no longer
+    telling you anything.
     """
     v = [("raw", dict(rep_penalty=1.0, adapt_strength=0.0))]
     if not getattr(args, "sample_raw_only", False):
@@ -2204,6 +2280,7 @@ def build_paged(wdir, device, resident=None, ram_capacity=256, ceiling=None,
         pool.route_bias = float(_get_cfg(_c, "pool.route_bias", 0.0) or 0.0)
         pool.route_bias_offset = float(
             _get_cfg(_c, "pool.route_bias_offset", 25.0) or 25.0)
+        pool.route_floor = float(_get_cfg(_c, "pool.route_floor", 0.0) or 0.0)
         pool.birth_gate_parents = float(
             _get_cfg(_c, "growth.birth_gate_parents", 0.0) or 0.0)
     except Exception:
@@ -2313,6 +2390,29 @@ def main():
                     default=_cfg(_c, "training.weight_decay", 0.1))
     rd.add_argument("--clip", type=float,
                     default=_cfg(_c, "training.clip", 1.0))
+    rd.add_argument("--loop-practice-every", type=int,
+                    default=_cfg(_c, "training.loop_practice_every", 0),
+                    help="after every this many steps, one more on a loop-"
+                         "practice window (minagi/practice.py); 0 is off")
+    rd.add_argument("--loop-practice-lambda", type=float,
+                    default=_cfg(_c, "training.loop_practice_lambda", 0.5),
+                    help="each copy of a practised span at most this times "
+                         "as likely as the one before")
+    rd.add_argument("--loop-practice-reps", type=int,
+                    default=_cfg(_c, "training.loop_practice_reps", 6),
+                    help="copies of the span in a practice window")
+    rd.add_argument("--self-play-every", type=int,
+                    default=_cfg(_c, "training.self_play_every", 0),
+                    help="after every this many steps, one more on the "
+                         "model's own continuation against the real one "
+                         "(minagi/practice.py); 0 is off")
+    rd.add_argument("--self-play-chars", type=int,
+                    default=_cfg(_c, "training.self_play_chars", 64),
+                    help="characters the model writes for a self-play step")
+    rd.add_argument("--self-play-sample", action="store_true",
+                    default=bool(_cfg(_c, "training.self_play_sample", False)),
+                    help="draw the model's continuation from its "
+                         "distribution instead of writing it greedily")
     rd.add_argument("--seed", type=int, default=0)
     rd.add_argument("--save", action="store_true",
                     help="keep what it learned; without this the run is a dry "
@@ -2339,7 +2439,9 @@ def main():
     rd.add_argument("--sample-every", type=float, default=0,
                     help="minutes between writing sample generations")
     rd.add_argument("--sample-log", default="runs/samples.txt")
-    rd.add_argument("--sample-chars", type=int, default=140)
+    rd.add_argument("--sample-chars", type=int,
+                    default=int(_cfg(_c, "samples.chars", 140)),
+                    help="characters written after each sample prompt")
     rd.add_argument("--save-every", type=float,
                     default=_cfg(_c, "training.save_every", 5),
                     help="minutes between checkpoints; 0 to save only at the "
@@ -2499,8 +2601,10 @@ def main():
                          "start: `since 40` was set at 60M read and by 189M "
                          "it was showing the whole history again")
     rd.add_argument("--sample-raw-only", action="store_true",
+                    default=bool(_cfg(_c, "samples.raw_only", False)),
                     help="write only the unguarded greedy reading of each "
-                         "prompt, not the adapted one as well")
+                         "prompt, not the adapted one as well "
+                         "(samples.raw_only in config.yaml)")
     rd.add_argument("--lr-reset", action="store_true",
                     help="restore the full learning rate by hand. The "
                          "plasticity controller does this on its own when "
