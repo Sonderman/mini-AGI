@@ -270,8 +270,21 @@ data:
   # every subject an even share, whatever its size.
   lane_schedule: auto
   # Fixed weights pin the shares instead, e.g. {self-knowledge: 0.25}: each
-  # above 0 and at most 1, unlisted subjects at 1.
-  lane_weights: {}
+  # above 0 and at most 1, unlisted subjects at 1. Pinned 2026-11-09 (Ali's
+  # call): the auto schedule kept abandoning a lane and that lane regressed
+  # (chat +0.016, then turkce +0.027), so the shares are fixed to turkce 12%,
+  # chat 10%, self-knowledge 5% and the other seven an even split of the rest.
+  lane_weights:
+    turkce: 0.96
+    chat: 0.80
+    self-knowledge: 0.40
+    arithmetic: 0.834
+    chess: 0.834
+    code: 0.834
+    pg19: 0.834
+    reasoning: 0.834
+    stories: 0.834
+    wikipedia: 0.834
 
 decoding:
   # Generation is greedy - no random numbers - so two samples taken at the
