@@ -168,7 +168,8 @@ against ~2,600 before it - external load suspected, not the model. A `--minutes 
    starts with fresh Adam moments, and rewrites the file at its first checkpoint — weights
    are unaffected. Observed 2026-10-06.
 5. The pool grows ~50-60 experts (~1.5 GB) per long session; `max_disk_gb` was raised to 30 on
-   2026-10-13 (Ali's call; ceiling ~1200 experts - more headroom, slower reads as the RAM hit rate drops).
+   2026-10-13 and to 40 on 2026-10-23, then set back to 32 on 2026-10-30 as a growth brake at the current pool size
+   (Ali's call; ~1270 experts, and ~11 GB of that is gated experts - more headroom only fed dead weight).
 
 ## State left behind (2026-10-09)
 
@@ -178,7 +179,7 @@ against ~2,600 before it - external load suspected, not the model. A `--minutes 
 raw arithmetic probe answered '4917 + 388' = 5305 exactly). Held-out is NOT comparable across the
 2026-10-08 wiring: the val set changed with it. Context 3,862 of 4,096; `optim.npz` healthy.
 The corpus is **1,048,097 files / 37,092.3M characters across 10 subjects**; read 459.3M = 1.24%
-of it. **Disk: 13.5 GB of the 30 GB ceiling (raised 10 -> 16 on 2026-10-09, 16 -> 30 on 2026-10-13; Warts #5).** Old lanes
+of it. **Disk: 31.8 GB of the 32 GB ceiling (raised 10 -> 16 on 2026-10-09, 16 -> 30 on 2026-10-13, 30 -> 40 on 2026-10-23, then 32 on 2026-10-30 as a growth brake; Warts #5).** Old lanes
 backed up in `data_old_20261008/`; delete once verified. `data_*` intermediates kept; the web UI
 runs via `start.bat` (or scratch/serve_supervisor.py); `keepawake.py` at the repo root prevents
 sleep during long runs; the real run is simply the train command above, left alone for days.
